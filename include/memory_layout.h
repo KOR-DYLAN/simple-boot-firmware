@@ -11,6 +11,7 @@
 
 /* Includes --------------------------------------------------------------- */
 #include "arch/arch_def.h"
+#include "boot_stage.h"
 
 /* Macro definitions ------------------------------------------------------ */
 #define MEMORY_REGION_ALIGNMENT  16

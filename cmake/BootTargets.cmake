@@ -5,7 +5,6 @@
 # Brief: Load platform execution targets and define the GDB client.
 
 # Platform execution targets -------------------------------------------------
-set(BOOT_ELF "${PROJECT_BINARY_DIR}/boot.elf")
 if(BOOT_PLATFORM_TARGETS)
     include("${BOOT_PLATFORM_TARGETS}")
 endif()

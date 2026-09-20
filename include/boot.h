@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: include/boot.h
- * Brief: Declare boot entry points and linker-defined memory boundaries.
+ * Brief: Declare boot, image handoff, and linker-defined boundaries.
  */
 
 #ifndef SIMPLE_BOOT_H
@@ -15,6 +15,11 @@
 /* Public entry points ---------------------------------------------------- */
 void boot_main(void);
 void boot_ready(void);
+void boot_stage_run(const char *stage_name);
+void boot_print_handoff(const char *name, uintptr_t entry);
+void boot_jump(uintptr_t entry, uintptr_t argument0, uintptr_t argument1,
+               uintptr_t argument2, uintptr_t argument3)
+    __attribute__((noreturn));
 void boot_halt(void) __attribute__((noreturn));
 
 /* Linker symbols --------------------------------------------------------- */

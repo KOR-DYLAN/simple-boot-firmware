@@ -56,7 +56,8 @@ make run ARCH=aarch32
 Replace `run` with `debug` and connect with `gdb` using the same variables.
 Both targets reset with PC zero. AArch64 remains in EL3h; AArch32 switches from
 Secure SVC to Monitor mode before runtime initialization. Firmware is loaded
-with `-bios boot.bin`, using secure flash for code/RO and secure SRAM for RW/stack.
+with `-bios firmware.bin`, using secure flash for both bootloader stages and
+secure SRAM for their independent RW and stack regions.
 
 To select RAM boot explicitly, use a separate build directory:
 
@@ -78,10 +79,13 @@ The common `gdb` target connects to this server. QEMU loads the selected ELF or
 firmware binary before GDB connects, so no separate GDB `load` is needed.
 
 The `virt` platform uses TCG, one CPU, 128 MiB RAM, virtualization, and GICv2.
-The generic loader applies the ELF physical addresses and entry point. MPS2
-uses `-kernel boot.elf` and resets through the vector table at address zero.
+The generic loader applies each ELF's physical addresses. MPS2 uses
+`-kernel bootloader1.elf`, loads `bootloader2.elf` separately, and resets through
+the bootloader1 vector table at address zero.
 
 ## Memory configuration
+
+Bootloader1 retains the reset layout:
 
 | Macro | `qemu/virt-secure` | `qemu/virt` | `qemu/mps2-an385` |
 | --- | --- | --- | --- |
@@ -93,6 +97,14 @@ uses `-kernel boot.elf` and resets through the vector table at address zero.
 | `RW_DATA_END` | `0x0E010000` | `0x40410000` | `0x20010000` |
 | `STACK_END` | `0x0E030000` | `0x407F0000` | `0x20030000` |
 | `STACK_START` | `0x0E040000` | `0x40800000` | `0x20040000` |
+
+Bootloader2 uses separate code, RW, and stack allocations:
+
+| Region | `qemu/virt-secure` | `qemu/virt` | `qemu/mps2-an385` |
+| --- | --- | --- | --- |
+| Code / RO | `[0x00100000, 0x00120000)` | `[0x41000000, 0x41020000)` | `[0x00100000, 0x00120000)` |
+| RW | `[0x0E010000, 0x0E020000)` | `[0x41200000, 0x41210000)` | `[0x20100000, 0x20110000)` |
+| Stack | `[0x0E040000, 0x0E050000)` | `[0x415F0000, 0x41600000)` | `[0x20130000, 0x20140000)` |
 
 Memory boundaries and permitted ranges are defined in:
 

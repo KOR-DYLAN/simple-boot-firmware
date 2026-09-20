@@ -7,3 +7,6 @@
 config BOOT
     bool "Boot image"
     default y
+
+source "boot/bl1/KConfig"
+source "boot/bl2/KConfig"

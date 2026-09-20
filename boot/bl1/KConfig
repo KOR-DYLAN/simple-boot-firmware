@@ -1,0 +1,10 @@
+# Copyright (c) 2026 simple-boot contributors
+# SPDX-License-Identifier: MIT
+#
+# File: boot/bl1/KConfig
+# Brief: Define bootloader1 image selection.
+
+config BOOTLOADER1
+    bool "Bootloader1 image"
+    depends on BOOT
+    default y

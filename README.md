@@ -1,7 +1,7 @@
 # simple-boot
 
-Minimal bare-metal startup for AArch64, AArch32, and ARMv7-M. Build with CMake,
-inspect the generated memory map, and debug with GDB. Platform code owns CPU
+Two-stage bare-metal startup for AArch64, AArch32, and ARMv7-M. Build with CMake,
+inspect the generated memory maps, and debug with GDB. Platform code owns CPU
 model selection, device addresses, external interrupts, and execution backends.
 See the [Platform guide](platform/README.md) for supported configurations.
 
@@ -20,9 +20,10 @@ make run ARCH=aarch64
 ```
 
 Use `ARCH=aarch32` or `ARCH=cortex-m` for the other architecture paths. The
-platform directory defines defaults when `PLATFORM` is omitted. Startup prints
-memory boundaries and `BOOT OK [architecture]`, then waits. Initialization
-failures print `BOOT FAIL` before halting.
+platform directory defines defaults when `PLATFORM` is omitted. Bootloader1
+initializes its runtime and jumps to bootloader2. Bootloader2 either waits or
+jumps to a configured U-Boot or kernel entry point. Initialization failures
+print `BOOT FAIL` before halting.
 
 The implementation uses freestanding C11 and GNU assembly. It supplies its own
 size, integer, memory, and string declarations and implementations under
@@ -199,41 +200,95 @@ make ARCH=aarch64 BUILD_DIR=build/custom-tools \
     CMAKE_ARGS='-DCROSS_COMPILE=/opt/aarch64-none-elf/bin/aarch64-none-elf- -DBOOT_GDB=/usr/bin/gdb-multiarch'
 ```
 
+## Boot flow
+
+The normal build creates two independently linked images:
+
+```text
+Reset -> bootloader1 -> bootloader2 -> optional U-Boot or kernel
+```
+
+Bootloader1 always transfers to `BOOTLOADER2_ENTRY_ADDRESS`, which each platform
+defines with the bootloader2 memory regions. Bootloader2 transfers to the payload
+when `CONFIG_BOOTLOADER2_AUTO_BOOT=y`. AArch64 and AArch32 pass four configured
+argument registers and branch directly. Cortex-M treats the entry address as a
+vector-table base, loads MSP and the reset handler, updates VTOR, and branches to
+the reset handler.
+
+The handoff code does not read a filesystem or storage device. The platform must
+make the next image available at its linked or configured address before the
+jump. QEMU loads both stage images automatically; secure flash platforms use the
+combined `firmware.bin` image.
+
+For QEMU, `BOOT_PAYLOAD_IMAGE` names a payload file. The default `raw` format
+loads it at `CONFIG_PAYLOAD_LOAD_ADDRESS`; `BOOT_PAYLOAD_FORMAT=elf` uses the
+ELF load addresses. Bootloader2 branches to `CONFIG_PAYLOAD_ENTRY_ADDRESS` in
+both cases. Save these values as a fragment such as
+`platform/qemu/virt-secure/configs/payload.config`:
+
+```text
+CONFIG_BOOTLOADER2_AUTO_BOOT=y
+CONFIG_PAYLOAD_LOAD_ADDRESS=0x42000000
+CONFIG_PAYLOAD_ENTRY_ADDRESS=0x42000000
+CONFIG_PAYLOAD_ARGUMENT_0=0x40000000
+CONFIG_PAYLOAD_ARGUMENT_1=0x0
+CONFIG_PAYLOAD_ARGUMENT_2=0x0
+CONFIG_PAYLOAD_ARGUMENT_3=0x0
+```
+
+Build and run with the fragment and raw image:
+
+```sh
+make run ARCH=aarch64 PLATFORM=qemu/virt-secure \
+    CONFIG='aarch64_defconfig,payload.config' \
+    CMAKE_ARGS='-DBOOT_PAYLOAD_IMAGE=/absolute/path/to/Image'
+```
+
+For an ELF payload, add `-DBOOT_PAYLOAD_FORMAT=elf` to `CMAKE_ARGS`.
+
+The payload must match the current architecture, execution level or processor
+mode, endianness, and calling convention. For AArch64 Linux,
+`CONFIG_PAYLOAD_ARGUMENT_0` normally carries the DTB address. AArch32 payloads
+can use all four argument settings for their entry protocol. A Cortex-M payload
+uses its vector table and ignores the argument settings.
+
 ## Build artifacts and memory-map viewer
 
 A normal build or the `boot` target produces the following files in `BUILD_DIR`:
 
 | File | Contents |
 | --- | --- |
-| `boot.elf` | Linked image, entry point, and debug symbols |
-| `boot.bin` | Raw load image beginning at `CODE_START` |
-| `boot.hex` | Intel HEX records using load addresses |
-| `boot.asm` | Disassembly with available source lines |
-| `boot.map` | Linker section and symbol report |
-| `boot.ld` | Preprocessed linker script |
+| `bootloader1.elf`, `bootloader2.elf` | Linked stage images and debug symbols |
+| `bootloader1.bin`, `bootloader2.bin` | Raw stage load images |
+| `bootloader1.hex`, `bootloader2.hex` | Intel HEX records using load addresses |
+| `bootloader1.asm`, `bootloader2.asm` | Disassembly with source lines |
+| `bootloader1.map`, `bootloader2.map` | Linker section and symbol reports |
+| `bootloader1.ld`, `bootloader2.ld` | Preprocessed stage linker scripts |
+| `firmware.bin` | Address-preserving combined BL1 and BL2 image |
 | `boot.gdb` | GDB connection script |
-| `memory-map.svg` | Standalone memory-layout diagram |
-| `memory-map.html` | Browser viewer with linked-content addresses and sizes |
-| `memory-map.json` | Region boundaries, capacity, usage, and section addresses |
+| `bootloader*-memory-map.svg` | Standalone memory-layout diagrams |
+| `bootloader*-memory-map.html` | Browser viewers for both stages |
+| `bootloader*-memory-map.json` | Stage region and section addresses |
 | `compile_commands.json` | Compiler invocations for editor tooling |
 | `clangd.config` | Editor configuration for this build directory |
 
 Open the HTML file directly in a browser; no server or graphics package is needed:
 
 ```sh
-xdg-open build/aarch64/memory-map.html
+xdg-open build/aarch64/bootloader1-memory-map.html
+xdg-open build/aarch64/bootloader2-memory-map.html
 ```
 
-The diagram uses symbols from the final ELF, including custom memory-header
+Each diagram uses symbols from its stage ELF, including custom memory-header
 values. It shows code, RO, RW, reserved gaps, and the stack with exact boundaries.
 Region heights are schematic; usage bars compare linked bytes with capacity.
 Stack allocation is shown separately from runtime stack usage, which is not
 measured. Reserved ranges do not imply installed RAM.
 
 Artifact generation runs on every normal build and every `boot` target invocation,
-even if the ELF needs no relink. Deleted exports are regenerated. The internal
-`boot_image` target links only the ELF; individual library targets build only
-the selected component.
+even if the ELF files need no relink. Deleted exports are regenerated. The
+`bootloader1_image` and `bootloader2_image` targets link only their ELF files;
+individual library targets build only the selected component.
 
 ### clangd
 
@@ -264,9 +319,9 @@ make debug ARCH=aarch64
 make gdb ARCH=aarch64
 ```
 
-GDB connects to `127.0.0.1:1234` by default and sets a temporary breakpoint at
-`boot_main`. Image loading and target reset are responsibilities of the platform
-backend; consult its guide before issuing additional GDB commands.
+GDB connects to `127.0.0.1:1234`, loads symbols for both stages, and sets a
+temporary breakpoint at `boot_main`. Image loading and target reset are
+responsibilities of the platform backend.
 
 ```gdb
 # Step startup, then continue to boot_main.
@@ -331,19 +386,24 @@ allocated capacity; the generated report also shows actual linked contents.
 `.data` initializers have a load address (LMA) in RO and a runtime address (VMA)
 in RW. Startup copies these bytes and clears `.bss` and the stack. Reserved gaps are excluded
 from initialization. `.bss` and `.stack` use `NOLOAD`, contributing no initial
-bytes to `boot.bin`. RO/RW labels express linker placement, not MMU/MPU protection.
+bytes to either stage binary. RO/RW labels express linker placement, not MMU/MPU
+protection.
 
 ### Custom memory headers
 
 Edit the platform header or set `BOOT_MEMORY_CONFIG` to override selected defaults.
-For example, a header can place RW relative to the selected RO end:
+The custom header can replace the named stage boundaries while keeping the
+bootloader2 entry synchronized with its code start:
 
 ```c
 #ifndef MY_MEMORY_H
 #define MY_MEMORY_H
 
-#define CUSTOM_RESERVED_GAP 0x00100000
-#define RW_DATA_START (RO_DATA_END + CUSTOM_RESERVED_GAP)
+#define BOOTLOADER2_CODE_START    0x00200000
+#define BOOTLOADER2_RW_START      0x0e080000
+#define BOOTLOADER2_STACK_END     0x0e0a0000
+#define BOOTLOADER2_STACK_START   0x0e0b0000
+#define BOOTLOADER2_ENTRY_ADDRESS BOOTLOADER2_CODE_START
 
 #endif
 ```
@@ -362,14 +422,17 @@ constants and arithmetic, without `U`/`UL` suffixes, casts, or `sizeof`.
 The linker requires positive region sizes, 16-byte boundary alignment,
 `CODE_END == RO_DATA_START`, `RO_DATA_END <= RW_DATA_START`, and
 `RW_DATA_END <= STACK_END < STACK_START`. Actual contents must fit their regions.
-Architecture vector alignment and platform address limits are also validated.
+Bootloader2 requires `CODE_START == BOOTLOADER2_ENTRY_ADDRESS`. Architecture
+vector alignment and platform address limits are also validated.
 
 ## Implementation structure
 
 | Location | Responsibility |
 | --- | --- |
 | `arch/` | Architecture startup, core exception handling, and assembly rules |
-| `boot/` | Application entry, linker script, ELF link, and artifact target |
+| `boot/` | Shared stage validation, linker script, image link, and artifacts |
+| `boot/bl1/` | Bootloader1 entry and bootloader2 handoff |
+| `boot/bl2/` | Bootloader2 entry and payload handoff |
 | `include/arch/` | Architectural register fields, ABI, and core vector constants |
 | `include/asm/` | Function, constant-load, address, and vector helper macros |
 | `include/library/libc/` | Project-owned size, integer, memory, and string declarations |
@@ -420,7 +483,10 @@ and external IRQ configuration belong in `platform_def.h`; region boundaries
 and allowed ranges belong in `platform_memory.h`. See the
 [Platform contract](platform/README.md#platform-contract) for included examples.
 
-Application functionality starts in [boot/main.c](boot/main.c). Interrupt support
+Shared runtime validation is implemented in [common.c](boot/common.c).
+[bootloader1](boot/bl1/main.c) and [bootloader2](boot/bl2/main.c) own their stage
+entry and handoff policy. Architecture-specific `boot_jump()` implementations
+perform the final register and vector-table handoff. Interrupt support
 requires controller/peripheral initialization, unmasking, and appropriate context
 save/restore. Default handlers provide fault inspection rather than a scheduler.
 ### Assembly macros

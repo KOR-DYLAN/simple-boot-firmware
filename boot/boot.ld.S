@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: boot/boot.ld.S
- * Brief: Place boot sections and validate the platform memory map.
+ * Brief: Place one boot stage and validate its platform memory map.
  */
 
 /* Includes --------------------------------------------------------------- */
@@ -33,7 +33,7 @@ __region_rw_end = RW_DATA_END;
 /* Program headers -------------------------------------------------------- */
 /*
  * Load .data initializers into RO, then copy them to RW at runtime. NOLOAD sections
- * add no file bytes to boot.bin; reserved gaps are excluded from runtime
+ * add no file bytes to the stage binary; reserved gaps are excluded from runtime
  * initialization.
  */
 PHDRS
@@ -122,9 +122,13 @@ SECTIONS
            "Code/RO outside the selected platform memory")
     ASSERT(RW_DATA_START >= BOARD_RAM_MIN && STACK_START <= BOARD_RAM_LIMIT,
            "RW/stack outside the selected platform RAM")
-#ifdef BOARD_RESET_VECTOR_ADDRESS
+#if BOOT_STAGE == BOOT_STAGE_1 && defined(BOARD_RESET_VECTOR_ADDRESS)
     ASSERT(CODE_START == BOARD_RESET_VECTOR_ADDRESS,
            "Platform reset vector address must be preserved")
+#endif
+#if BOOT_STAGE == BOOT_STAGE_2
+    ASSERT(CODE_START == BOOTLOADER2_ENTRY_ADDRESS,
+           "Bootloader2 entry must equal its code start")
 #endif
     ASSERT((CODE_START & (ARCH_VECTOR_ALIGNMENT - 1)) == 0,
            "Code start must satisfy the architecture vector alignment")

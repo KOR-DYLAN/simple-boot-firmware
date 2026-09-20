@@ -35,6 +35,9 @@ set(BOOT_CONFIGURED_ARCH "${BOOT_ARCH}" CACHE INTERNAL "Architecture of this bui
 
 # Memory option --------------------------------------------------------------
 set(BOOT_MEMORY_CONFIG "" CACHE FILEPATH "Optional header overriding memory boundaries")
+set(BOOT_PAYLOAD_IMAGE "" CACHE FILEPATH "Optional U-Boot or kernel image")
+set(BOOT_PAYLOAD_FORMAT raw CACHE STRING "Payload image format: raw or elf")
+set_property(CACHE BOOT_PAYLOAD_FORMAT PROPERTY STRINGS raw elf)
 
 # Board configuration selection ----------------------------------------------
 set(BOOT_PLATFORM "" CACHE STRING "Platform directory under platform/")
@@ -100,6 +103,33 @@ set(BOOT_CONFIG "${BOOT_CONFIG}" CACHE STRING
 set(BOOT_LOCAL_CONFIG_FILE "${CMAKE_BINARY_DIR}/kconfig.fragment")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/KConfig.cmake")
 boot_load_kconfig()
+
+# Payload configuration -----------------------------------------------------
+if(CONFIG_BOOT AND (NOT CONFIG_BOOTLOADER1 OR NOT CONFIG_BOOTLOADER2))
+    message(FATAL_ERROR "CONFIG_BOOT requires bootloader1 and bootloader2")
+endif()
+if(CONFIG_BOOTLOADER2_AUTO_BOOT AND CONFIG_PAYLOAD_ENTRY_ADDRESS STREQUAL "0")
+    message(FATAL_ERROR
+        "CONFIG_PAYLOAD_ENTRY_ADDRESS must be nonzero when payload handoff is enabled"
+    )
+endif()
+if(BOOT_PAYLOAD_IMAGE)
+    get_filename_component(BOOT_PAYLOAD_IMAGE "${BOOT_PAYLOAD_IMAGE}"
+        ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+    if(NOT EXISTS "${BOOT_PAYLOAD_IMAGE}")
+        message(FATAL_ERROR "BOOT_PAYLOAD_IMAGE does not exist: ${BOOT_PAYLOAD_IMAGE}")
+    endif()
+    if(NOT BOOT_PAYLOAD_FORMAT MATCHES "^(raw|elf)$")
+        message(FATAL_ERROR "BOOT_PAYLOAD_FORMAT must be raw or elf")
+    endif()
+    if(BOOT_PAYLOAD_FORMAT STREQUAL "raw" AND
+       CONFIG_PAYLOAD_LOAD_ADDRESS STREQUAL "0")
+        message(FATAL_ERROR
+            "CONFIG_PAYLOAD_LOAD_ADDRESS must be nonzero for a raw payload image"
+        )
+    endif()
+endif()
 
 # Platform selection ---------------------------------------------------------
 if(BOOT_PLATFORM AND NOT CONFIG_PLATFORM_NAME STREQUAL BOOT_PLATFORM)

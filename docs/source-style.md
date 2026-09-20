@@ -34,7 +34,8 @@ CMake files use line comments:
 
 Use `/* ... */` for `.S` comments. A leading `#` can be interpreted as a C
 preprocessor directive. The linker source is `boot/boot.ld.S`;
-CMake generates `boot.ld` from it. Edit the source, not the generated file.
+CMake generates `bootloader1.ld` and `bootloader2.ld` from it. Edit the source,
+not the generated files.
 
 ## Section order
 

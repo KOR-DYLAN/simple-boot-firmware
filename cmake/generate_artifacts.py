@@ -147,7 +147,7 @@ def render_svg(layout):
     return "\n".join(parts) + "\n"
 
 
-def render_html(layout, svg):
+def render_html(layout, svg, memory_map):
     rows = []
     for item in layout["sections"]:
         rows.append(f'<tr><td>{html.escape(item["name"])}</td><td>0x{item["start"]:x}</td>'
@@ -162,8 +162,8 @@ table{width:100%;border-collapse:collapse;margin:24px 0}th,td{padding:12px;text-
 border-bottom:1px solid #334155}td:not(:first-child){font-family:monospace}
 .scroll{overflow-x:auto}h2{font-size:20px}p{color:#94a3b8}
 </style><main>''' + svg + '''
-<p><a href="memory-map.svg" download>Download SVG</a> &middot;
-<a href="memory-map.json" download>Download layout JSON</a></p>
+<p><a href="''' + memory_map + '''.svg" download>Download SVG</a> &middot;
+<a href="''' + memory_map + '''.json" download>Download layout JSON</a></p>
 <h2>Linked contents</h2><div class="scroll"><table>
 <thead><tr><th>Contents</th><th>Start</th><th>End (exclusive)</th><th>Bytes</th></tr></thead>
 <tbody>''' + "".join(rows) + '''</tbody></table></div>
@@ -178,18 +178,21 @@ def generate(args):
     update_editor(args.source_dir.resolve(), build)
     if args.editor_only:
         return
-    elf = build / "boot.elf"
+    elf = args.elf.resolve()
+    output_prefix = args.image_name
     symbols = read_symbols(args.readelf, elf)
     layout = memory_layout(symbols, args.arch)
     for output_format, suffix in (("binary", "bin"), ("ihex", "hex")):
         subprocess.run([args.objcopy, "-O", output_format, str(elf),
-                        str(build / f"boot.{suffix}")], check=True)
-    atomic_write(build / "boot.asm", tool_output(args.objdump, "-d", "-S", "-w", elf))
+                        str(build / f"{output_prefix}.{suffix}")], check=True)
+    atomic_write(build / f"{output_prefix}.asm",
+                 tool_output(args.objdump, "-d", "-S", "-w", elf))
     svg = render_svg(layout)
-    atomic_write(build / "memory-map.json", json.dumps(layout, indent=2) + "\n")
-    atomic_write(build / "memory-map.svg", svg)
-    atomic_write(build / "memory-map.html", render_html(layout, svg))
-    print("Generated BIN, Intel HEX, disassembly, and SVG/HTML memory map.")
+    memory_map = f"{output_prefix}-memory-map"
+    atomic_write(build / f"{memory_map}.json", json.dumps(layout, indent=2) + "\n")
+    atomic_write(build / f"{memory_map}.svg", svg)
+    atomic_write(build / f"{memory_map}.html", render_html(layout, svg, memory_map))
+    print(f"Generated {output_prefix} images, disassembly, and memory map.")
 
 
 def main():
@@ -197,12 +200,16 @@ def main():
     parser.add_argument("--build-dir", type=Path, required=True)
     parser.add_argument("--source-dir", type=Path, required=True)
     parser.add_argument("--editor-only", action="store_true")
+    parser.add_argument("--elf", type=Path)
+    parser.add_argument("--image-name")
     parser.add_argument("--arch", choices=("aarch64", "aarch32", "cortex-m"))
     for name in ("objcopy", "objdump", "readelf"):
         parser.add_argument(f"--{name}")
     args = parser.parse_args()
-    if not args.editor_only and not all((args.arch, args.objcopy, args.objdump, args.readelf)):
-        parser.error("image generation requires --arch, --objcopy, --objdump, and --readelf")
+    if not args.editor_only and not all((args.arch, args.elf, args.image_name,
+                                         args.objcopy, args.objdump, args.readelf)):
+        parser.error("image generation requires --arch, --elf, --image-name, "
+                     "--objcopy, --objdump, and --readelf")
     generate(args)
 
 

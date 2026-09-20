@@ -2,8 +2,8 @@
  * Copyright (c) 2026 simple-boot contributors
  * SPDX-License-Identifier: MIT
  *
- * File: boot/main.c
- * Brief: Report the memory map and check initialized boot state.
+ * File: boot/common.c
+ * Brief: Validate runtime state shared by both bootloader stages.
  */
 
 /* Includes --------------------------------------------------------------- */
@@ -28,14 +28,21 @@ static void print_region(const char *name, uintptr_t start, uintptr_t end)
     console_puts("\n");
 }
 
-/* Application entry points ----------------------------------------------- */
+/* Shared stage operations ------------------------------------------------ */
+void boot_print_handoff(const char *name, uintptr_t entry)
+{
+    console_puts(name);
+    console_hex(entry);
+    console_puts("\n");
+}
+
 /* A stable GDB breakpoint after the runtime checks complete. */
 __attribute__((noinline)) void boot_ready(void)
 {
     __asm__ volatile ("" ::: "memory");
 }
 
-void boot_main(void)
+void boot_stage_run(const char *stage_name)
 {
     uintptr_t stack_pointer;
 
@@ -51,7 +58,9 @@ void boot_main(void)
 #endif
 
     console_init();
-    console_puts("simple-boot [");
+    console_puts("simple-boot ");
+    console_puts(stage_name);
+    console_puts(" [");
     console_puts(arch);
     console_puts("]\n");
     print_region("CODE     ", CODE_START, CODE_END);
@@ -75,7 +84,9 @@ void boot_main(void)
 
     boot_status = BOOT_STATUS_READY;
     boot_ready();
-    console_puts("BOOT OK [");
+    console_puts("BOOT OK ");
+    console_puts(stage_name);
+    console_puts(" [");
     console_puts(arch);
     console_puts("]\n");
 }

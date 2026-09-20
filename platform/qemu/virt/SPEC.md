@@ -18,10 +18,11 @@ physical development board.
 | Interrupt controller | GICv2; interrupts remain masked | GICv2; interrupts remain masked |
 | Floating-point/SIMD use | General registers only | Soft-float ABI |
 
-The ELF generic loader applies the entry point and physical load addresses.
-RAM capacity is 128 MiB. The first 2 MiB is reserved for the DTB; code starts at
-`0x40200000`. The program leaves MMU/caches disabled and uses polling UART output.
-These execution settings are defined in [platform.cmake](platform.cmake).
+The ELF generic loader applies the bootloader1 entry point and both images'
+physical load addresses. RAM capacity is 128 MiB. The first 2 MiB is reserved
+for the DTB. Bootloader1 code starts at `0x40200000`, and bootloader2 code starts
+at `0x41000000`. Both stages leave MMU/caches disabled and use polling UART
+output. These execution settings are defined in [platform.cmake](platform.cmake).
 
 | Region or device | Address range / setting |
 | --- | --- |
@@ -33,6 +34,11 @@ These execution settings are defined in [platform.cmake](platform.cmake).
 | UART reference clock | 24 MHz |
 | UART configuration | 115200 baud, 8 data bits, no parity, 1 stop bit |
 | Default code / RO / RW / stack capacity | 64 KiB each |
+
+Bootloader1 uses RW at `0x40400000` and stack
+`[0x407f0000, 0x40800000)`. Bootloader2 uses RW at `0x41200000` and stack
+`[0x415f0000, 0x41600000)`. Each code region is followed by a separate 64 KiB
+RO region.
 
 Device layout and clock values follow the
 [QEMU 8.2.2 virt implementation](https://github.com/qemu/qemu/blob/v8.2.2/hw/arm/virt.c).

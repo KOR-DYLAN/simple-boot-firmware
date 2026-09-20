@@ -2,12 +2,13 @@
 # SPDX-License-Identifier: MIT
 #
 # File: cmake/boot.gdb.in
-# Brief: Select the boot ELF and connect to the configured debug server.
+# Brief: Load both bootloader symbol files and connect to the debug server.
 
 set pagination off
 set confirm off
-file "@BOOT_ELF@"
+file "@BOOTLOADER1_ELF@"
+add-symbol-file "@BOOTLOADER2_ELF@"
 target remote 127.0.0.1:@BOOT_GDB_PORT@
 tbreak boot_main
 display/i $pc
-echo Connected at startup. Use 'si' to step or 'continue' to reach boot_main.\n
+echo Connected at bootloader1 startup. Use 'si' or 'continue'.\n
