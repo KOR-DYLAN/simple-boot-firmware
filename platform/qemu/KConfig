@@ -1,0 +1,22 @@
+# Copyright (c) 2026 simple-boot contributors
+# SPDX-License-Identifier: MIT
+#
+# File: platform/qemu/KConfig
+# Brief: Compose QEMU board configuration symbols.
+
+config PLATFORM_QEMU
+    bool "QEMU platforms"
+    depends on PLATFORM
+    default n
+
+config QEMU_RAM_SIZE
+    string "QEMU main RAM size"
+    default "128M"
+
+config QEMU_CPU_COUNT
+    int "QEMU CPU count"
+    default 1
+
+source "platform/qemu/virt/KConfig"
+source "platform/qemu/virt-secure/KConfig"
+source "platform/qemu/mps2-an385/KConfig"

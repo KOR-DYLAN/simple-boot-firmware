@@ -5,4 +5,6 @@
 # Brief: Select the architecture implementation.
 
 # Subdirectory selection -----------------------------------------------------
-add_subdirectory("${BOOT_ARCH}")
+add_subdirectory_if_enabled(CONFIG_ARCH_AARCH64 aarch64)
+add_subdirectory_if_enabled(CONFIG_ARCH_AARCH32 aarch32)
+add_subdirectory_if_enabled(CONFIG_ARCH_CORTEX_M cortex-m)

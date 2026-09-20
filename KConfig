@@ -1,0 +1,12 @@
+# Copyright (c) 2026 simple-boot contributors
+# SPDX-License-Identifier: MIT
+#
+# File: KConfig
+# Brief: Compose the project configuration hierarchy.
+
+source "cmake/KConfig"
+source "arch/KConfig"
+source "library/KConfig"
+source "driver/KConfig"
+source "platform/KConfig"
+source "boot/KConfig"

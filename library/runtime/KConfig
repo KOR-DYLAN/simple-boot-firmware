@@ -1,0 +1,20 @@
+# Copyright (c) 2026 simple-boot contributors
+# SPDX-License-Identifier: MIT
+#
+# File: library/runtime/KConfig
+# Brief: Define runtime initialization sources.
+
+config RUNTIME
+    bool "Assembly runtime initialization"
+    depends on LIBRARY
+    default y
+
+config RUNTIME_AARCH64
+    bool "AArch64 runtime source"
+    depends on RUNTIME
+    default n
+
+config RUNTIME_AARCH32
+    bool "AArch32 and Cortex-M runtime source"
+    depends on RUNTIME
+    default n

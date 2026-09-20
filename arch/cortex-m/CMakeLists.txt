@@ -5,5 +5,5 @@
 # Brief: Build the cortex-m startup object library.
 
 # Library target -------------------------------------------------------------
-add_library(boot_arch OBJECT startup.S)
-target_link_libraries(boot_arch PRIVATE boot_options)
+add_library_if_enabled(CONFIG_ARCH_CORTEX_M boot_arch OBJECT startup.S)
+target_link_libraries_if_enabled(CONFIG_ARCH_CORTEX_M boot_arch PRIVATE boot_options)

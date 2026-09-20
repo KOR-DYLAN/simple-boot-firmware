@@ -22,8 +22,8 @@ endif()
 
 # QEMU machine configuration -------------------------------------------------
 set(BOOT_QEMU_GIC_VERSION 2)
-set(BOOT_QEMU_RAM_SIZE 128M)
-set(BOOT_QEMU_CPU_COUNT 1)
+set(BOOT_QEMU_RAM_SIZE "${CONFIG_QEMU_RAM_SIZE}")
+set(BOOT_QEMU_CPU_COUNT "${CONFIG_QEMU_CPU_COUNT}")
 set(BOOT_QEMU_ARGS -machine virt,virtualization=on,gic-version=${BOOT_QEMU_GIC_VERSION}
     -cpu ${BOOT_QEMU_CPU} -m ${BOOT_QEMU_RAM_SIZE} -smp ${BOOT_QEMU_CPU_COUNT})
 

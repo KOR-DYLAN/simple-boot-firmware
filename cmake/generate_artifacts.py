@@ -24,7 +24,8 @@ def atomic_write(path, text):
     try:
         temporary.replace(path)
     finally:
-        temporary.unlink(missing_ok=True)
+        if temporary.exists():
+            temporary.unlink()
 
 
 def update_editor(source_dir, build_dir):
@@ -39,8 +40,9 @@ def update_editor(source_dir, build_dir):
 
 
 def tool_output(tool, *arguments):
-    return subprocess.check_output([tool, *map(str, arguments)], text=True,
-                                   encoding="utf-8", env={**os.environ, "LC_ALL": "C"})
+    return subprocess.check_output([tool, *map(str, arguments)],
+                                   universal_newlines=True, encoding="utf-8",
+                                   env={**os.environ, "LC_ALL": "C"})
 
 
 # ELF layout -----------------------------------------------------------------

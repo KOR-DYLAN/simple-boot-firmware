@@ -1,0 +1,10 @@
+# Copyright (c) 2026 simple-boot contributors
+# SPDX-License-Identifier: MIT
+#
+# File: arch/cortex-m/KConfig
+# Brief: Define Cortex-M architecture selection.
+
+config ARCH_CORTEX_M
+    bool "Cortex-M startup"
+    depends on ARCH
+    default n

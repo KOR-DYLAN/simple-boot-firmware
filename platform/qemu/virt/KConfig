@@ -1,0 +1,10 @@
+# Copyright (c) 2026 simple-boot contributors
+# SPDX-License-Identifier: MIT
+#
+# File: platform/qemu/virt/KConfig
+# Brief: Define the QEMU virt RAM-boot platform selection.
+
+config PLATFORM_QEMU_VIRT
+    bool "QEMU virt RAM boot"
+    depends on PLATFORM_QEMU
+    default n

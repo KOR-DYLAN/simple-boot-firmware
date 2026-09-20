@@ -4,5 +4,7 @@
 # File: platform/qemu/CMakeLists.txt
 # Brief: Select the configured QEMU board.
 
-# Subdirectory selection -----------------------------------------------------
-add_subdirectory("${BOOT_PLATFORM_BOARD}")
+# Board selection ------------------------------------------------------------
+add_subdirectory_if_enabled(CONFIG_PLATFORM_QEMU_VIRT virt)
+add_subdirectory_if_enabled(CONFIG_PLATFORM_QEMU_VIRT_SECURE virt-secure)
+add_subdirectory_if_enabled(CONFIG_PLATFORM_QEMU_MPS2_AN385 mps2-an385)

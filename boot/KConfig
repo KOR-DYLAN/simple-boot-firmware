@@ -1,0 +1,9 @@
+# Copyright (c) 2026 simple-boot contributors
+# SPDX-License-Identifier: MIT
+#
+# File: boot/KConfig
+# Brief: Define boot image generation.
+
+config BOOT
+    bool "Boot image"
+    default y

@@ -1,0 +1,10 @@
+# Copyright (c) 2026 simple-boot contributors
+# SPDX-License-Identifier: MIT
+#
+# File: platform/qemu/mps2-an385/KConfig
+# Brief: Define the QEMU MPS2 AN385 platform selection.
+
+config PLATFORM_QEMU_MPS2_AN385
+    bool "QEMU MPS2 AN385"
+    depends on PLATFORM_QEMU
+    default n

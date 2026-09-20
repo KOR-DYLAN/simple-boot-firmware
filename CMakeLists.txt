@@ -14,8 +14,8 @@ include(cmake/EditorConfig.cmake)
 
 # Build components -----------------------------------------------------------
 add_subdirectory(cmake)
-add_subdirectory(arch)
-add_subdirectory(library)
-add_subdirectory(driver)
-add_subdirectory(platform)
-add_subdirectory(boot)
+add_subdirectory_if_enabled(CONFIG_ARCH arch)
+add_subdirectory_if_enabled(CONFIG_LIBRARY library)
+add_subdirectory_if_enabled(CONFIG_DRIVER driver)
+add_subdirectory_if_enabled(CONFIG_PLATFORM platform)
+add_subdirectory_if_enabled(CONFIG_BOOT boot)

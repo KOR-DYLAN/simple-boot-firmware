@@ -2,7 +2,12 @@
 # SPDX-License-Identifier: MIT
 #
 # File: driver/CMakeLists.txt
-# Brief: Compose device driver subsystems.
+# Brief: Build the aggregate driver library.
 
-# Subdirectory selection -----------------------------------------------------
-add_subdirectory(console)
+# Aggregate library ----------------------------------------------------------
+add_library_if_enabled(CONFIG_DRIVER libdriver STATIC)
+set_target_properties(libdriver PROPERTIES PREFIX "")
+target_link_libraries_if_enabled(CONFIG_DRIVER libdriver PUBLIC boot_options)
+
+# Driver composition ---------------------------------------------------------
+add_subdirectory_if_enabled(CONFIG_CONSOLE console)

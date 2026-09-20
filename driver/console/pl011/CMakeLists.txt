@@ -2,8 +2,7 @@
 # SPDX-License-Identifier: MIT
 #
 # File: driver/console/pl011/CMakeLists.txt
-# Brief: Build the pl011 console backend.
+# Brief: Add the PL011 console backend to the driver library.
 
-# Library target -------------------------------------------------------------
-add_library(boot_console_driver STATIC "${CMAKE_CURRENT_LIST_DIR}/pl011.c")
-target_link_libraries(boot_console_driver PUBLIC boot_options)
+# Driver sources -------------------------------------------------------------
+add_source_if_enabled(CONFIG_DRIVER_PL011 pl011.c)

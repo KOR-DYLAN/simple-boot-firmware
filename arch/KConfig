@@ -1,0 +1,13 @@
+# Copyright (c) 2026 simple-boot contributors
+# SPDX-License-Identifier: MIT
+#
+# File: arch/KConfig
+# Brief: Compose architecture configuration symbols.
+
+config ARCH
+    bool "Architecture support"
+    default y
+
+source "arch/aarch64/KConfig"
+source "arch/aarch32/KConfig"
+source "arch/cortex-m/KConfig"

@@ -2,8 +2,7 @@
 # SPDX-License-Identifier: MIT
 #
 # File: platform/qemu/mps2-an385/CMakeLists.txt
-# Brief: Build the QEMU mps2-an385 platform console binding.
+# Brief: Add the QEMU MPS2 AN385 console binding to the driver library.
 
-# Library target -------------------------------------------------------------
-add_library(boot_platform STATIC "${CMAKE_CURRENT_LIST_DIR}/console.c")
-target_link_libraries(boot_platform PUBLIC boot_options boot_console_driver)
+# Driver sources -------------------------------------------------------------
+add_source_if_enabled(CONFIG_PLATFORM_QEMU_MPS2_AN385 console.c)

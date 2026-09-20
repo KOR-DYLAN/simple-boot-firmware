@@ -1,0 +1,13 @@
+# Copyright (c) 2026 simple-boot contributors
+# SPDX-License-Identifier: MIT
+#
+# File: driver/console/KConfig
+# Brief: Compose console driver configuration symbols.
+
+config CONSOLE
+    bool "Console subsystem"
+    depends on DRIVER
+    default y
+
+source "driver/console/pl011/KConfig"
+source "driver/console/cmsdk_apb_uart/KConfig"

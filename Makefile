@@ -9,6 +9,7 @@
 SOURCE_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 ARCH ?= aarch64
 PLATFORM ?=
+CONFIG ?=
 BUILD_DIR ?= $(SOURCE_DIR)/build/$(ARCH)
 BUILD_TYPE ?= Debug
 GENERATOR ?= Ninja
@@ -17,16 +18,23 @@ PYTHON ?= python3
 CMAKE_ARGS ?=
 BUILD_ARGS ?=
 TARGET ?= boot
-JOBS ?=$(nproc)
+JOBS ?=
 
-.PHONY: all configure build target run debug gdb layout clean distclean targets help
+.PHONY: all configure defconfig menuconfig savedefconfig savefragmentconfig fragmentconfig showconfig build target run debug gdb layout clean distclean targets help
 
 all: build
 
 configure:
 	$(CMAKE) -S "$(SOURCE_DIR)" -B "$(BUILD_DIR)" -G "$(GENERATOR)" \
 		-DBOOT_ARCH="$(ARCH)" $(if $(PLATFORM),-DBOOT_PLATFORM="$(PLATFORM)") \
+		$(if $(CONFIG),-DBOOT_CONFIG="$(CONFIG)") \
 		-DCMAKE_BUILD_TYPE="$(BUILD_TYPE)" $(CMAKE_ARGS)
+
+defconfig menuconfig savedefconfig savefragmentconfig fragmentconfig: configure
+	+$(CMAKE) --build "$(BUILD_DIR)" --target $@ $(BUILD_ARGS)
+
+showconfig: configure
+	@$(CMAKE) -E cat "$(BUILD_DIR)/.config"
 
 build: configure
 	+$(CMAKE) --build "$(BUILD_DIR)" $(if $(JOBS),--parallel $(JOBS)) $(BUILD_ARGS)
@@ -54,6 +62,12 @@ help:
 		'Targets:' \
 		'  build       Configure and build (default).' \
 		'  configure   Run CMake configure only.' \
+		'  defconfig   Generate .config from the selected board configuration.' \
+		'  menuconfig  Edit the merged configuration in a terminal menu.' \
+		'  savedefconfig Save BUILD_DIR/defconfig relative to KConfig defaults.' \
+		'  savefragmentconfig Save BUILD_DIR/fragment.config relative to board configs.' \
+		'  fragmentconfig Alias for savefragmentconfig.' \
+		'  showconfig  Print the normalized generated .config.' \
 		'  run         Run the platform execution target.' \
 		'  debug       Start the platform debug server.' \
 		'  gdb         Connect GDB to the running debug target.' \
@@ -65,6 +79,7 @@ help:
 		'' \
 		'Variables:' \
 		'  ARCH=aarch64|aarch32|cortex-m  PLATFORM=vendor/board' \
+		'  CONFIG=config-file-name' \
 		'  BUILD_DIR=path  BUILD_TYPE=Debug|Release  GENERATOR=Ninja' \
 		'  JOBS=count  TARGET=boot  CMAKE=cmake  PYTHON=python3' \
 		'  CMAKE_ARGS="configure options"  BUILD_ARGS="build options"'

@@ -12,9 +12,13 @@ platform configuration without selecting a machine.
 | `qemu/virt-secure` | `aarch64`, `aarch32` | Cortex-A53 / Cortex-A15 | PL011 |
 | `qemu/mps2-an385` | `cortex-m` | Cortex-M3 | CMSDK APB UART |
 
-[defaults.cmake](defaults.cmake) selects `qemu/virt-secure` for AArch64/AArch32 and
-`qemu/mps2-an385` for Cortex-M when no platform is specified. Root presets and
-Makefile commands use this platform-owned selection.
+The `virt-secure` board provides `aarch64_defconfig` and `aarch32_defconfig`;
+MPS2 AN385 provides `cortex-m_defconfig`. CMake discovers the single matching
+default file for the selected architecture and reads the platform name from its
+`CONFIG_PLATFORM_NAME` value. No common file contains a default board list.
+When `BOOT_PLATFORM` is explicit, `BOOT_CONFIG` names a file directly under that
+board's `configs/` directory and must not contain directory components. Multiple
+comma-separated names are merged from left to right.
 
 Install QEMU on Ubuntu/Debian with:
 
@@ -61,7 +65,7 @@ make run ARCH=aarch64 PLATFORM=qemu/virt BUILD_DIR=build/ram-aarch64
 make run ARCH=aarch32 PLATFORM=qemu/virt BUILD_DIR=build/ram-aarch32
 ```
 
-CMake preserves the platform selection in each build directory. Use
+CMake preserves the config and platform selection in each build directory. Use
 `make distclean ARCH=<architecture>` before configuring that directory with
 the default selection if its cache selects another platform.
 
@@ -109,9 +113,13 @@ and verifies the resulting table size and alignment.
 
 A platform directory contains:
 
+- `KConfig`: board selection and board-specific configuration symbols.
+- `configs/<architecture>_defconfig`: default boolean, string, and numeric
+  settings for an architecture.
+- `configs/<architecture>.config`: settings selected when the board is explicit.
 - `platform.cmake`: supported architectures, CPU flags, console driver, and
   optional `BOOT_PLATFORM_TARGETS` execution-hook path.
-- `CMakeLists.txt`: the `boot_platform` library and its dependencies.
+- `CMakeLists.txt`: sources contributed to the aggregate `libdriver` target.
 - `console.c`: console device binding.
 - `include/platform_def.h`: device parameters and external IRQ configuration.
 - `include/platform_memory.h`: memory boundaries and permitted ranges.

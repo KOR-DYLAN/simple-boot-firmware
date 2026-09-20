@@ -5,7 +5,7 @@
 # Brief: Select the active compilation database for clangd.
 
 # Artifact generator ---------------------------------------------------------
-find_package(Python3 3.8 REQUIRED COMPONENTS Interpreter)
+find_package(Python3 3.6 REQUIRED COMPONENTS Interpreter)
 set(BOOT_ARTIFACT_GENERATOR "${CMAKE_CURRENT_LIST_DIR}/generate_artifacts.py")
 
 # Editor configuration -------------------------------------------------------

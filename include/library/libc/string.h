@@ -2,7 +2,7 @@
  * Copyright (c) 2026 simple-boot contributors
  * SPDX-License-Identifier: MIT
  *
- * File: library/libc/include/string.h
+ * File: include/library/libc/string.h
  * Brief: Declare the freestanding memory and string API.
  */
 
@@ -10,7 +10,7 @@
 #define SIMPLE_BOOT_STRING_H
 
 /* Includes --------------------------------------------------------------- */
-#include <stddef.h>
+#include "stddef.h"
 
 /* Public API ------------------------------------------------------------- */
 void *memcpy(void *restrict destination, const void *restrict source, size_t count);

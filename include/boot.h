@@ -10,7 +10,7 @@
 #define SIMPLE_BOOT_H
 
 /* Includes --------------------------------------------------------------- */
-#include <stdint.h>
+#include "stdint.h"
 
 /* Public entry points ---------------------------------------------------- */
 void boot_main(void);

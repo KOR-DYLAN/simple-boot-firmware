@@ -10,7 +10,7 @@
 #define SIMPLE_BOOT_CONSOLE_H
 
 /* Includes --------------------------------------------------------------- */
-#include <stdint.h>
+#include "stdint.h"
 
 /* Macro definitions ------------------------------------------------------ */
 #define CONSOLE_BAUD_ROUNDING_DENOMINATOR 2

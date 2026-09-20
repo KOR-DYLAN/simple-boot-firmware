@@ -7,7 +7,7 @@ See the [Platform guide](platform/README.md) for supported configurations.
 
 ## Quick start
 
-Install GNU Make, CMake 3.21 or later, Ninja, Python 3.8 or later, and a GNU cross
+Install GNU Make, CMake 3.21 or later, Ninja, Python 3.6 or later, and a GNU cross
 toolchain. Add a GDB that supports the target architecture and the execution
 tools described by the selected platform.
 
@@ -24,7 +24,11 @@ platform directory defines defaults when `PLATFORM` is omitted. Startup prints
 memory boundaries and `BOOT OK [architecture]`, then waits. Initialization
 failures print `BOOT FAIL` before halting.
 
-The implementation uses freestanding C11 and GNU assembly. Startup assumes
+The implementation uses freestanding C11 and GNU assembly. It supplies its own
+size, integer, memory, and string declarations and implementations under
+`include/library/libc/` and `library/libc/`. Compilation uses `-nostdinc`,
+`-ffreestanding`, and `-fno-builtin`; no toolchain libc headers or hosted libc
+are used. Startup assumes
 little-endian execution with the MMU and caches disabled. Interrupts remain
 masked. The included console drivers use polling. The project provides a small
 memory/string library, with no OS, heap, C++ runtime, or floating-point/SIMD setup.
@@ -35,11 +39,16 @@ memory/string library, with no OS, heap, C++ runtime, or floating-point/SIMD set
 | --- | --- |
 | `make` or `make build` | Configure, compile, and generate all artifacts |
 | `make configure` | Configure and select the editor compilation database |
+| `make defconfig` | Reset `.config` from the selected board configurations |
+| `make menuconfig` | Edit configuration using a terminal menu |
+| `make savedefconfig` | Save `BUILD_DIR/defconfig` relative to KConfig defaults |
+| `make savefragmentconfig` | Save `BUILD_DIR/fragment.config` relative to board configs |
+| `make showconfig` | Print the normalized generated configuration |
 | `make run` | Build and invoke the platform execution target |
 | `make debug` | Build and invoke the platform debug-server target |
 | `make gdb` | Build and connect GDB to the debug server |
 | `make layout` | Generate artifacts and print ELF sections/program headers |
-| `make target TARGET=boot_libc` | Build a specific component |
+| `make target TARGET=liblibrary` | Build the aggregate freestanding library |
 | `make targets` | List available CMake targets |
 | `make clean` | Remove outputs from an existing build directory |
 | `make distclean` | Remove the selected build directory, including CMake configuration |
@@ -64,7 +73,8 @@ make distclean BUILD_DIR=build/custom-memory
 | Make variable | Default | Purpose |
 | --- | --- | --- |
 | `ARCH` | `aarch64` | Target architecture |
-| `PLATFORM` | Platform-owned default | Directory under `platform/` |
+| `PLATFORM` | Derived from the default config | Directory under `platform/` |
+| `CONFIG` | Selected board config | Comma-separated file names under the board's `configs/` directory |
 | `BUILD_DIR` | `build/$(ARCH)` | Build directory |
 | `BUILD_TYPE` | `Debug` | `Debug` or `Release` |
 | `GENERATOR` | `Ninja` | `Ninja` or `Unix Makefiles` |
@@ -80,6 +90,90 @@ or generators:
 ```sh
 make ARCH=aarch64 BUILD_DIR=build/release-aarch64 BUILD_TYPE=Release JOBS=4
 ```
+
+## KConfig build composition
+
+Every build directory in the source tree contains both `CMakeLists.txt` and
+`KConfig`. The root [KConfig](KConfig) sources the architecture, library, driver,
+platform, and boot configuration trees. Board configurations use the following
+location and assignment forms:
+
+```text
+platform/<vendor>/<board>/configs/<name>
+
+CONFIG_FEATURE=y
+CONFIG_OTHER_FEATURE=n
+CONFIG_PLATFORM_NAME="vendor/board"
+CONFIG_GDB_PORT=1234
+```
+
+The Python parser supports `bool`, `string`, `int`, `hex`, and unquoted `value`
+symbols, defaults, single-symbol dependencies, nested `source` statements, and
+the `# CONFIG_NAME is not set` form. It uses only the Python standard library.
+Unknown symbols, invalid values, duplicate assignments, unmet dependencies, and
+recursive source inclusion stop configuration.
+
+Configuration produces `BUILD_DIR/.config`, `BUILD_DIR/generated/autoconf.h`,
+and `BUILD_DIR/generated/config.cmake`. C and assembly compilation, linker-script
+preprocessing, and CMake directory composition consume these generated files.
+Changes to an input `KConfig` or the selected board configuration automatically
+trigger CMake configuration again.
+
+Multiple files are merged from left to right. Later assignments override earlier
+assignments, while duplicate assignments within one file remain errors:
+
+```sh
+make ARCH=aarch64 PLATFORM=qemu/virt-secure \
+    CONFIG='aarch64_defconfig,debug.config'
+```
+
+The command above merges both files into `BUILD_DIR/.config`. Commas, semicolons,
+and whitespace can separate file names when invoking CMake directly; quoting is
+recommended when whitespace is used.
+
+`make menuconfig` starts from the merged `.config`. Arrow keys or `j`/`k` move,
+Space or Enter edits a value, `S` saves, and `Q` exits without saving. Saved
+changes are recorded in `BUILD_DIR/kconfig.fragment` relative to the selected
+board configs and are applied last on subsequent configure runs.
+
+`make defconfig` removes the local menu fragment and reconstructs `.config` from
+the files named by `CONFIG`. `make savedefconfig` writes symbols that differ from
+KConfig defaults. `make savefragmentconfig` writes symbols that differ from the
+merged board configs; `make fragmentconfig` is an alias.
+
+The build helpers conditionally compose every selectable build layer:
+
+```cmake
+add_subdirectory_if_enabled(CONFIG_NAME directory)
+add_library_if_enabled(CONFIG_NAME target STATIC sources...)
+add_executable_if_enabled(CONFIG_NAME target sources...)
+add_source_if_enabled(CONFIG_NAME sources...)
+target_link_libraries_if_enabled(CONFIG_NAME target PUBLIC libraries...)
+```
+
+The directory helper also requires the selected directory to contain both
+`CMakeLists.txt` and `KConfig`. `add_library_if_enabled` records the aggregate
+target as an inherited directory property, so child directories add sources
+without repeating its name. The platform tree selects the existing `libdriver`
+aggregate before contributing board bindings.
+
+Each architecture has one default file named `<arch>_defconfig` across the
+platform tree. Its location selects the default board, while
+`CONFIG_PLATFORM_NAME` inside the file provides the platform path. A board may
+also provide `<arch>.config` for explicit `PLATFORM` selection. Select another
+configuration explicitly when creating a separate build directory:
+
+```sh
+make defconfig ARCH=aarch64 PLATFORM=qemu/virt \
+    BUILD_DIR=build/ram-aarch64 \
+    CONFIG=aarch64.config
+make showconfig ARCH=aarch64 PLATFORM=qemu/virt BUILD_DIR=build/ram-aarch64
+```
+
+Each `CONFIG` entry accepts a file name only. CMake resolves it under
+`platform/<vendor>/<board>/configs/` after selecting `PLATFORM`; directory
+components and path traversal are rejected. When `PLATFORM` is omitted, the
+default board's `configs/` directory is used.
 
 ### Direct CMake and toolchain selection
 
@@ -197,10 +291,10 @@ should be zero, and status should match `BOOT_STATUS_READY`. Definitions are in
 [boot_status.h](include/boot_status.h). Use **Ctrl+C** to interrupt execution in
 GDB; finish with `detach` and `quit`.
 
-Select a different port for simultaneous sessions:
+Select a different port for simultaneous sessions in a board configuration:
 
-```sh
-make debug ARCH=aarch64 CMAKE_ARGS='-DBOOT_GDB_PORT=2345'
+```text
+CONFIG_GDB_PORT=2345
 ```
 
 CMake searches for the compiler-prefix GDB, then `gdb-multiarch`. Set `BOOT_GDB`
@@ -278,14 +372,16 @@ Architecture vector alignment and platform address limits are also validated.
 | `boot/` | Application entry, linker script, ELF link, and artifact target |
 | `include/arch/` | Architectural register fields, ABI, and core vector constants |
 | `include/asm/` | Function, constant-load, address, and vector helper macros |
+| `include/library/libc/` | Project-owned size, integer, memory, and string declarations |
 | `driver/console/` | Generic console API and reusable UART IP drivers |
 | `library/libc/` | Freestanding memory and string routines |
 | `library/runtime/` | Stackless assembly for `.data` copy and `.bss`/stack clearing |
 | `platform/` | Default selection, CPU models, devices, IRQs, and execution backends |
 | `cmake/` | Generic configuration, toolchains, editor setup, and artifact exporter |
 
-Each source directory owns its `CMakeLists.txt`. `boot_arch` is an OBJECT
-library; libc, runtime, console, driver, and platform are static libraries.
+Each build directory owns its `CMakeLists.txt` and `KConfig`. `boot_arch` is an
+OBJECT library. All selected driver and platform-binding sources are collected
+in `libdriver.a`; libc and runtime sources are collected in `liblibrary.a`.
 `boot_options` shares headers, definitions, and compiler flags.
 
 AArch64 accepts EL1, EL2, and EL3 reset entry. EL2 descends to EL1h; EL3 remains
@@ -311,9 +407,11 @@ the byte unchanged. The libc subset provides `memcpy`, `memmove`, `memset`,
 
 ### Adding a platform
 
-Create `platform/<vendor>/<board>/` with a `platform.cmake`, `CMakeLists.txt`,
-console binding, and platform headers. The vendor CMake file selects the board
-with `add_subdirectory("${BOOT_PLATFORM_BOARD}")`.
+Create `platform/<vendor>/<board>/` with `platform.cmake`, `CMakeLists.txt`,
+`KConfig`, architecture-specific files under `configs/`, a console binding, and
+platform headers. Add the vendor and board symbols to their parent `KConfig`
+files, then select them with `add_subdirectory_if_enabled` in the corresponding
+parent `CMakeLists.txt`.
 
 Define `BOOT_SUPPORTED_ARCHS`, `BOOT_CPU_FLAGS`, and `BOOT_CONSOLE_DRIVER`.
 Optionally supply `BOOT_PLATFORM_TARGETS`, a CMake file defining `run` and `debug`.

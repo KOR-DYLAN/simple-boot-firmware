@@ -55,7 +55,7 @@ Section labels name a responsibility, such as `Platform compatibility checks` or
 
 ```c
 /* Includes --------------------------------------------------------------- */
-#include <stdint.h>
+#include "stdint.h"
 
 /* Macro definitions ------------------------------------------------------ */
 #define EXAMPLE_READY 1
@@ -72,6 +72,15 @@ target_link_libraries(example PUBLIC boot_options)
 
 ## CMake conventions
 
+- Each directory participating in the build contains `CMakeLists.txt` and `KConfig`.
+- Use the helpers ending in `_if_enabled` for configurable directories, targets,
+  sources, and target dependencies.
+- Create `libdriver` only in `driver/` and `liblibrary` only in `library/`.
+  Child directories contribute sources to these aggregate targets.
+- `add_library_if_enabled` establishes the inherited source target. Use
+  `set_source_target` only when a sibling tree contributes to an existing target.
+- Include project-owned C types using file names such as `stddef.h` and
+  `stdint.h`. Do not include toolchain libc headers.
 - Parent directories select child directories; leaf directories own their sources.
 - Keep target creation beside its include paths, definitions, and dependencies.
 - Separate configuration, compatibility checks, and generated-file commands in
@@ -95,6 +104,10 @@ CPU model names, device addresses, external IRQ counts, emulator settings, and
 machine-specific documentation belong under `platform/`. Common architecture
 code retains architectural rules and consumes platform-provided definitions.
 Build reports and editor configuration are generated from the selected build.
+Default board selection is declared by a board-local
+`configs/<architecture>_defconfig`; common CMake code discovers it without a
+central board list. Board config fragments contain only assignments they need to
+override and are merged from left to right.
 
 ## Alignment
 

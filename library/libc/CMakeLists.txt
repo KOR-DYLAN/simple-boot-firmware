@@ -2,12 +2,13 @@
 # SPDX-License-Identifier: MIT
 #
 # File: library/libc/CMakeLists.txt
-# Brief: Build freestanding memory and string routines.
+# Brief: Add freestanding memory and string routines to the library.
 
-# Library target -------------------------------------------------------------
-add_library(boot_libc STATIC "${CMAKE_CURRENT_LIST_DIR}/string.c")
-target_link_libraries(boot_libc PUBLIC boot_options)
+# Library sources ------------------------------------------------------------
+add_source_if_enabled(CONFIG_LIBC string.c)
 
 # Freestanding implementation options ----------------------------------------
 # Keep GCC from replacing these loops with recursive libc calls.
-target_compile_options(boot_libc PRIVATE -fno-tree-loop-distribute-patterns)
+set_source_files_properties(string.c TARGET_DIRECTORY liblibrary PROPERTIES
+    COMPILE_OPTIONS -fno-tree-loop-distribute-patterns
+)

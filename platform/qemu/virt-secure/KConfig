@@ -1,0 +1,15 @@
+# Copyright (c) 2026 simple-boot contributors
+# SPDX-License-Identifier: MIT
+#
+# File: platform/qemu/virt-secure/KConfig
+# Brief: Define the QEMU virt secure-reset platform selection.
+
+config PLATFORM_QEMU_VIRT_SECURE
+    bool "QEMU virt secure reset"
+    depends on PLATFORM_QEMU
+    default n
+
+config SECURE_BOOT
+    bool "Remain in the highest secure boot mode"
+    depends on PLATFORM_QEMU_VIRT_SECURE
+    default n

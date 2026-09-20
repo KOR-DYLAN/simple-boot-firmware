@@ -1,0 +1,10 @@
+# Copyright (c) 2026 simple-boot contributors
+# SPDX-License-Identifier: MIT
+#
+# File: arch/aarch64/KConfig
+# Brief: Define AArch64 architecture selection.
+
+config ARCH_AARCH64
+    bool "AArch64 startup"
+    depends on ARCH
+    default n

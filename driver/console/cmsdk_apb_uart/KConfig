@@ -1,0 +1,10 @@
+# Copyright (c) 2026 simple-boot contributors
+# SPDX-License-Identifier: MIT
+#
+# File: driver/console/cmsdk_apb_uart/KConfig
+# Brief: Define the CMSDK APB UART driver selection.
+
+config DRIVER_CMSDK_APB_UART
+    bool "CMSDK APB UART console driver"
+    depends on CONSOLE
+    default n

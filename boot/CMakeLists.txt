@@ -22,12 +22,14 @@ set(BOOT_LINKER_SCRIPT "${PROJECT_BINARY_DIR}/boot.ld")
 add_custom_command(
     OUTPUT "${BOOT_LINKER_SCRIPT}"
     COMMAND "${CMAKE_C_COMPILER}" ${BOOT_CPU_FLAGS} ${BOOT_CPP_DEFINES}
-            ${BOOT_CPP_INCLUDES} -E -P -x c
+            ${BOOT_CPP_INCLUDES} -nostdinc
+            -include "${BOOT_AUTOCONF_HEADER}" -E -P -x c
             -MMD -MF "${PROJECT_BINARY_DIR}/boot.ld.d" -MT "${BOOT_LINKER_SCRIPT}"
             "${CMAKE_CURRENT_SOURCE_DIR}/boot.ld.S" -o "${BOOT_LINKER_SCRIPT}"
     DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/boot.ld.S"
         "${PROJECT_SOURCE_DIR}/include/memory_layout.h"
+        "${BOOT_AUTOCONF_HEADER}"
         "${BOOT_PLATFORM_DIR}/include/platform_memory.h"
         ${BOOT_MEMORY_CONFIG}
     DEPFILE "${PROJECT_BINARY_DIR}/boot.ld.d"
@@ -36,7 +38,7 @@ add_custom_command(
 add_custom_target(boot_linker_script DEPENDS "${BOOT_LINKER_SCRIPT}")
 
 # Boot executable ------------------------------------------------------------
-add_executable(boot_image main.c)
+add_executable_if_enabled(CONFIG_BOOT boot_image main.c)
 set_target_properties(boot_image PROPERTIES
     OUTPUT_NAME boot
     RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}"
@@ -45,7 +47,10 @@ set_target_properties(boot_image PROPERTIES
     C_STANDARD_REQUIRED YES
     C_EXTENSIONS NO
 )
-target_link_libraries(boot_image PRIVATE boot_options boot_arch boot_runtime boot_console boot_libc)
+target_link_libraries_if_enabled(
+    CONFIG_BOOT boot_image PRIVATE
+    boot_options boot_arch liblibrary libdriver
+)
 
 # Link options and dependencies ----------------------------------------------
 target_link_options(boot_image PRIVATE

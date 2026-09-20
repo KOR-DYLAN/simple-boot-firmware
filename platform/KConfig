@@ -1,0 +1,15 @@
+# Copyright (c) 2026 simple-boot contributors
+# SPDX-License-Identifier: MIT
+#
+# File: platform/KConfig
+# Brief: Compose platform configuration symbols and identity.
+
+config PLATFORM
+    bool "Platform support"
+    default y
+
+config PLATFORM_NAME
+    string "Selected vendor and board"
+    default ""
+
+source "platform/qemu/KConfig"

@@ -2,8 +2,13 @@
 # SPDX-License-Identifier: MIT
 #
 # File: library/CMakeLists.txt
-# Brief: Compose the freestanding libraries and runtime.
+# Brief: Build the aggregate freestanding library.
 
-# Subdirectory selection -----------------------------------------------------
-add_subdirectory(libc)
-add_subdirectory(runtime)
+# Aggregate library ----------------------------------------------------------
+add_library_if_enabled(CONFIG_LIBRARY liblibrary STATIC)
+set_target_properties(liblibrary PROPERTIES PREFIX "" LINKER_LANGUAGE C)
+target_link_libraries_if_enabled(CONFIG_LIBRARY liblibrary PUBLIC boot_options)
+
+# Library composition --------------------------------------------------------
+add_subdirectory_if_enabled(CONFIG_LIBC libc)
+add_subdirectory_if_enabled(CONFIG_RUNTIME runtime)
