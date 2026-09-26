@@ -3,10 +3,12 @@
  * SPDX-License-Identifier: MIT
  *
  * File: boot/common.c
- * Brief: Validate runtime state shared by both bootloader stages.
+ * Brief: Validate the boot image runtime state.
  */
 
 /* Includes --------------------------------------------------------------- */
+#include <assert.h>
+#include <stdio.h>
 #include "arch/arch_def.h"
 #include "boot.h"
 #include "boot_status.h"
@@ -28,7 +30,7 @@ static void print_region(const char *name, uintptr_t start, uintptr_t end)
     console_puts("\n");
 }
 
-/* Shared stage operations ------------------------------------------------ */
+/* Shared boot operations ------------------------------------------------- */
 void boot_print_handoff(const char *name, uintptr_t entry)
 {
     console_puts(name);
@@ -37,32 +39,29 @@ void boot_print_handoff(const char *name, uintptr_t entry)
 }
 
 /* A stable GDB breakpoint after the runtime checks complete. */
-__attribute__((noinline)) void boot_ready(void)
+COMPILER_NOINLINE void boot_ready(void)
 {
-    __asm__ volatile ("" ::: "memory");
+    COMPILER_BARRIER();
 }
 
-void boot_stage_run(const char *stage_name)
+void boot_run(const char *image_name)
 {
     uintptr_t stack_pointer;
+    const char *arch;
 
 #if defined(BOOT_ARCH_AARCH64)
     __asm__ volatile ("mov %0, sp" : "=r" (stack_pointer));
-    const char *arch = "aarch64";
+    arch = "aarch64";
 #elif defined(BOOT_ARCH_AARCH32)
     __asm__ volatile ("mov %0, sp" : "=r" (stack_pointer));
-    const char *arch = "aarch32";
+    arch = "aarch32";
 #else
     __asm__ volatile ("mrs %0, msp" : "=r" (stack_pointer));
-    const char *arch = "cortex-m";
+    arch = "cortex-m";
 #endif
 
     console_init();
-    console_puts("simple-boot ");
-    console_puts(stage_name);
-    console_puts(" [");
-    console_puts(arch);
-    console_puts("]\n");
+    printf("simple-boot %s [%s]\n", image_name, arch);
     print_region("CODE     ", CODE_START, CODE_END);
     print_region("RO DATA  ", RO_DATA_START, RO_DATA_END);
     print_region("RESERVED ", RO_DATA_END, RW_DATA_START);
@@ -72,20 +71,20 @@ void boot_stage_run(const char *stage_name)
     print_region(".data LMA/VMA ",
                  (uintptr_t)__data_load_start, (uintptr_t)__data_start);
 
-    if (boot_data_cookie != BOOT_DATA_COOKIE_INITIAL ||
-        boot_bss_cookie != BOOT_BSS_INITIAL ||
-        stack_pointer < STACK_END ||
-        stack_pointer >= STACK_START ||
-        (stack_pointer & (ARCH_STACK_ALIGNMENT - 1)) != 0) {
-        boot_status = BOOT_STATUS_FAILED;
-        console_puts("BOOT FAIL: data/bss/stack check\n");
-        boot_halt();
-    }
+    assert_msg((boot_data_cookie == BOOT_DATA_COOKIE_INITIAL),
+               "initialized data cookie is corrupted");
+    assert((boot_bss_cookie == BOOT_BSS_INITIAL));
+    assert_msg((stack_pointer >= STACK_END),
+               "stack pointer is below the allocated stack");
+    assert_msg((stack_pointer < STACK_START),
+               "stack pointer is above the allocated stack");
+    assert_msg(((stack_pointer & (ARCH_STACK_ALIGNMENT - U(1))) == U(0)),
+               "stack pointer does not satisfy ABI alignment");
 
     boot_status = BOOT_STATUS_READY;
     boot_ready();
     console_puts("BOOT OK ");
-    console_puts(stage_name);
+    console_puts(image_name);
     console_puts(" [");
     console_puts(arch);
     console_puts("]\n");

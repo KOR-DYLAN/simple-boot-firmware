@@ -25,7 +25,7 @@ initializes its runtime and jumps to bootloader2. Bootloader2 either waits or
 jumps to a configured U-Boot or kernel entry point. Initialization failures
 print `BOOT FAIL` before halting.
 
-The implementation uses freestanding C11 and GNU assembly. It supplies its own
+The implementation uses freestanding C99 and GNU assembly. It supplies its own
 size, integer, memory, and string declarations and implementations under
 `include/library/libc/` and `library/libc/`. Compilation uses `-nostdinc`,
 `-ffreestanding`, and `-fno-builtin`; no toolchain libc headers or hosted libc
@@ -38,13 +38,15 @@ memory/string library, with no OS, heap, C++ runtime, or floating-point/SIMD set
 
 | Command | Action |
 | --- | --- |
-| `make` or `make build` | Configure, compile, and generate all artifacts |
-| `make configure` | Configure and select the editor compilation database |
-| `make defconfig` | Reset `.config` from the selected board configurations |
-| `make menuconfig` | Edit configuration using a terminal menu |
-| `make savedefconfig` | Save `BUILD_DIR/defconfig` relative to KConfig defaults |
-| `make savefragmentconfig` | Save `BUILD_DIR/fragment.config` relative to board configs |
-| `make showconfig` | Print the normalized generated configuration |
+| `make` or `make build` | Independently configure and build every entry in `CONFIGS` |
+| `make configure` | Configure every entry in `CONFIGS` |
+| `make build-bl1`, `make build-bl2` | Configure and build one named configuration |
+| `make firmware` | Build and combine the pair selected by `FIRMWARE_CONFIGS` |
+| `make defconfig BUILD_CONFIG=bl1` | Reset one selected configuration |
+| `make menuconfig BUILD_CONFIG=bl2` | Edit one configuration using a terminal menu |
+| `make savedefconfig BUILD_CONFIG=bl1` | Save one config relative to defaults |
+| `make savefragmentconfig BUILD_CONFIG=bl2` | Save one config relative to its inputs |
+| `make showconfig BUILD_CONFIG=bl1` | Print one normalized configuration |
 | `make run` | Build and invoke the platform execution target |
 | `make debug` | Build and invoke the platform debug-server target |
 | `make gdb` | Build and connect GDB to the debug server |
@@ -55,16 +57,15 @@ memory/string library, with no OS, heap, C++ runtime, or floating-point/SIMD set
 | `make distclean` | Remove the selected build directory, including CMake configuration |
 | `make help` | Show commands and variables |
 
-All build and target-list commands run configure first. Additional CMake cache
-settings persist across configure runs.
+Each name in `CONFIGS` uses `<name>.config` and owns a separate CMake cache,
+generated headers, compilation database, libraries, and object files under
+`BUILD_DIR/<name>`. The Makefile is the multi-config orchestration layer; each
+CMake invocation still configures and builds exactly one image.
 
-`make distclean` removes the entire selected `BUILD_DIR`, including its cache,
-compilation database, and generated artifacts. It also removes the generated
-root `.clangd` if that file selects the same build directory. Other build
-directories and their editor selections are preserved. No configure step is
-required, and repeating the command succeeds when the directory is already absent.
-Existing directories must contain a CMake cache belonging to this source tree;
-source directories, their ancestors, and symbolic-link build directories are rejected.
+`make distclean` validates and removes the build directory for every entry in
+`CONFIGS` and the combined `firmware.bin`. It also removes the generated root
+`.clangd` when that file selects a removed build. Other build directories and
+manually authored editor settings are preserved.
 
 ```sh
 make distclean ARCH=aarch64
@@ -75,13 +76,20 @@ make distclean BUILD_DIR=build/custom-memory
 | --- | --- | --- |
 | `ARCH` | `aarch64` | Target architecture |
 | `PLATFORM` | Derived from the default config | Directory under `platform/` |
-| `CONFIG` | Selected board config | Comma-separated file names under the board's `configs/` directory |
-| `BUILD_DIR` | `build/$(ARCH)` | Build directory |
+| `CONFIG` | Selected board config | Comma-separated base configuration file names |
+| `CONFIGS` | `bl1 bl2` | Configuration names independently configured and built |
+| `BUILD_CONFIG` | First entry in `CONFIGS` | Config used by menu and single-target commands |
+| `FIRMWARE_CONFIGS` | `bl1 bl2` | Ordered pair combined by `make firmware` |
+| `FRAGMENTS` | Empty | Fragments appended to every configuration |
+| `FRAGMENTS_<name>` | Empty | Fragments appended only to one named configuration |
+| `BUILD_DIR` | `build/$(ARCH)` | Parent directory for named configuration builds |
+| `BUILD_DIR_<name>` | `BUILD_DIR/<name>` | Optional output override for one configuration |
 | `BUILD_TYPE` | `Debug` | `Debug` or `Release` |
 | `GENERATOR` | `Ninja` | `Ninja` or `Unix Makefiles` |
 | `JOBS` | Build tool default | Parallel compilation jobs |
 | `TARGET` | `boot` | Target for `make target` |
 | `CMAKE_ARGS` | Empty | Extra configure arguments |
+| `CMAKE_ARGS_<name>` | Empty | Extra configure arguments for one configuration |
 | `BUILD_ARGS` | Empty | Extra build arguments |
 | `CMAKE` | `cmake` | CMake executable |
 
@@ -96,11 +104,12 @@ make ARCH=aarch64 BUILD_DIR=build/release-aarch64 BUILD_TYPE=Release JOBS=4
 
 Every build directory in the source tree contains both `CMakeLists.txt` and
 `KConfig`. The root [KConfig](KConfig) sources the architecture, library, driver,
-platform, and boot configuration trees. Board configurations use the following
-location and assignment forms:
+platform, and boot configuration trees. Board configurations and reusable common
+fragments use the following locations and assignment forms:
 
 ```text
 platform/<vendor>/<board>/configs/<name>
+configs/<name>
 
 CONFIG_FEATURE=y
 CONFIG_OTHER_FEATURE=n
@@ -114,9 +123,10 @@ the `# CONFIG_NAME is not set` form. It uses only the Python standard library.
 Unknown symbols, invalid values, duplicate assignments, unmet dependencies, and
 recursive source inclusion stop configuration.
 
-Configuration produces `BUILD_DIR/.config`, `BUILD_DIR/generated/autoconf.h`,
-and `BUILD_DIR/generated/config.cmake`. C and assembly compilation, linker-script
-preprocessing, and CMake directory composition consume these generated files.
+Each named configuration produces its own `.config`, `generated/autoconf.h`, and
+`generated/config.cmake` below `BUILD_DIR/<name>`. C and assembly compilation,
+linker-script preprocessing, and CMake composition consume only the outputs
+belonging to that configuration.
 Changes to an input `KConfig` or the selected board configuration automatically
 trigger CMake configuration again.
 
@@ -128,20 +138,35 @@ make ARCH=aarch64 PLATFORM=qemu/virt-secure \
     CONFIG='aarch64_defconfig,debug.config'
 ```
 
-The command above merges both files into `BUILD_DIR/.config`. Commas, semicolons,
-and whitespace can separate file names when invoking CMake directly; quoting is
-recommended when whitespace is used.
+The command above merges both files into each named configuration before its
+`<name>.config` file is applied. Additional fragments can be shared by every
+configuration or isolated to one name:
 
-`make menuconfig` starts from the merged `.config` and opens an nconfig-style
-terminal UI with a configuration list and symbol detail panel. Arrow keys or
+```sh
+make ARCH=aarch64 PLATFORM=qemu/virt \
+    CONFIGS='bl1 bl2' \
+    FRAGMENTS=diagnostics.config FRAGMENTS_bl2=payload.config
+```
+
+The merge order is `CONFIG`, `<name>.config`, `FRAGMENTS`, and then
+`FRAGMENTS_<name>`. Commas, semicolons, and whitespace can
+separate file names when invoking CMake directly; quoting is recommended when
+whitespace is used.
+
+`make menuconfig BUILD_CONFIG=bl1` starts from that configuration's merged
+`.config` and opens an nconfig-style terminal UI with a configuration list and
+symbol detail panel.
+Arrow keys or
 `j`/`k` move, Space or Enter edits a value, `S` saves, and `Q` exits without
-saving. Saved changes are recorded in `BUILD_DIR/kconfig.fragment` relative to
-the selected board configs and are applied last on subsequent configure runs.
+saving. Saved changes are recorded in the selected image build directory's
+`kconfig.fragment`, relative to all input configs, and are applied last on
+subsequent configure runs.
 
 `make defconfig` removes the local menu fragment and reconstructs `.config` from
-the files named by `CONFIG`. `make savedefconfig` writes symbols that differ from
-KConfig defaults. `make savefragmentconfig` writes symbols that differ from the
-merged board configs; `make fragmentconfig` is an alias.
+all selected input files. `make savedefconfig` writes each symbol that differs
+from its KConfig default exactly once, omitting default-enabled and otherwise
+redundant assignments. `make savefragmentconfig` writes only the delta from all
+selected input files; `make fragmentconfig` is an alias.
 
 The build helpers conditionally compose every selectable build layer:
 
@@ -168,24 +193,30 @@ configuration explicitly when creating a separate build directory:
 ```sh
 make defconfig ARCH=aarch64 PLATFORM=qemu/virt \
     BUILD_DIR=build/ram-aarch64 \
-    CONFIG=aarch64.config
-make showconfig ARCH=aarch64 PLATFORM=qemu/virt BUILD_DIR=build/ram-aarch64
+    CONFIG=aarch64.config BUILD_CONFIG=bl1
+make showconfig ARCH=aarch64 PLATFORM=qemu/virt \
+    BUILD_DIR=build/ram-aarch64 BUILD_CONFIG=bl1
 ```
 
-Each `CONFIG` entry accepts a file name only. CMake resolves it under
-`platform/<vendor>/<board>/configs/` after selecting `PLATFORM`; directory
-components and path traversal are rejected. When `PLATFORM` is omitted, the
-default board's `configs/` directory is used.
+Each config or fragment entry accepts a file name only. CMake first resolves it
+under `platform/<vendor>/<board>/configs/`, then falls back to the root
+`configs/` directory for shared fragments. Directory components and path
+traversal are rejected. When `PLATFORM` is omitted, the default board's
+`configs/` directory is used for the first lookup.
 
 ### Direct CMake and toolchain selection
 
-Presets use Ninja and Debug. Replace `aarch64` with another architecture as needed:
+Presets use Ninja and Debug. Configure and build each image independently:
 
 ```sh
-cmake --preset aarch64
-cmake --build --preset aarch64
-cmake --build build/aarch64 --target run
+cmake --preset aarch64-bl1
+cmake --preset aarch64-bl2
+cmake --build --preset aarch64-bl1
+cmake --build --preset aarch64-bl2
 ```
+
+Direct CMake builds produce one image only. Use `make firmware` to orchestrate
+both configurations and create the combined flat image.
 
 CMake selects `cmake/toolchains/<BOOT_ARCH>.cmake`. Shared GNU tool discovery is
 in [arm-gcc.cmake](cmake/toolchains/arm-gcc.cmake). CPU model flags are supplied by
@@ -241,7 +272,8 @@ Build and run with the fragment and raw image:
 
 ```sh
 make run ARCH=aarch64 PLATFORM=qemu/virt-secure \
-    CONFIG='aarch64_defconfig,payload.config' \
+    CONFIG=aarch64_defconfig \
+    FRAGMENTS_bl2=payload.config \
     CMAKE_ARGS='-DBOOT_PAYLOAD_IMAGE=/absolute/path/to/Image'
 ```
 
@@ -255,29 +287,25 @@ uses its vector table and ignores the argument settings.
 
 ## Build artifacts and memory-map viewer
 
-A normal build or the `boot` target produces the following files in `BUILD_DIR`:
+A normal Make build produces the following files across the isolated directories:
 
 | File | Contents |
 | --- | --- |
-| `bootloader1.elf`, `bootloader2.elf` | Linked stage images and debug symbols |
-| `bootloader1.bin`, `bootloader2.bin` | Raw stage load images |
-| `bootloader1.hex`, `bootloader2.hex` | Intel HEX records using load addresses |
-| `bootloader1.asm`, `bootloader2.asm` | Disassembly with source lines |
-| `bootloader1.map`, `bootloader2.map` | Linker section and symbol reports |
-| `bootloader1.ld`, `bootloader2.ld` | Preprocessed stage linker scripts |
+| `bl1/bootloader1.*` | BL1 ELF, BIN, HEX, disassembly, map, and linker script |
+| `bl2/bootloader2.*` | BL2 ELF, BIN, HEX, disassembly, map, and linker script |
 | `firmware.bin` | Address-preserving combined BL1 and BL2 image |
-| `boot.gdb` | GDB connection script |
-| `bootloader*-memory-map.svg` | Standalone memory-layout diagrams |
-| `bootloader*-memory-map.html` | Browser viewers for both stages |
-| `bootloader*-memory-map.json` | Stage region and section addresses |
-| `compile_commands.json` | Compiler invocations for editor tooling |
-| `clangd.config` | Editor configuration for this build directory |
+| `bl1/boot.gdb` | GDB connection script using both image symbol files |
+| `bl*/bootloader*-memory-map.svg` | Standalone memory-layout diagrams |
+| `bl*/bootloader*-memory-map.html` | Browser viewers for both stages |
+| `bl*/bootloader*-memory-map.json` | Stage region and section addresses |
+| `bl*/compile_commands.json` | Per-image compiler invocations for editor tooling |
+| `bl*/clangd.config` | Per-image editor configuration |
 
 Open the HTML file directly in a browser; no server or graphics package is needed:
 
 ```sh
-xdg-open build/aarch64/bootloader1-memory-map.html
-xdg-open build/aarch64/bootloader2-memory-map.html
+xdg-open build/aarch64/bl1/bootloader1-memory-map.html
+xdg-open build/aarch64/bl2/bootloader2-memory-map.html
 ```
 
 Each diagram uses symbols from its stage ELF, including custom memory-header
@@ -287,9 +315,10 @@ Stack allocation is shown separately from runtime stack usage, which is not
 measured. Reserved ranges do not imply installed RAM.
 
 Artifact generation runs on every normal build and every `boot` target invocation,
-even if the ELF files need no relink. Deleted exports are regenerated. The
-`bootloader1_image` and `bootloader2_image` targets link only their ELF files;
-individual library targets build only the selected component.
+even if the ELF files need no relink. Deleted exports are regenerated. Each
+build tree contains only its selected `bootloader1_image` or
+`bootloader2_image` target. Individual library targets and objects are never
+shared between the two configurations.
 
 ### clangd
 
@@ -298,7 +327,7 @@ root `.clangd` to reference the selected build directory's compilation database.
 The generated configuration removes the GCC-only libc loop-optimization flag
 from editor parsing; actual compiler commands retain it.
 
-The latest configure or image build selects the active editor configuration.
+The latest BL1 or BL2 configure/build selects the active editor configuration.
 When switching architectures, configure the desired directory again:
 
 ```sh
@@ -434,9 +463,10 @@ vector alignment and platform address limits are also validated.
 | `boot/` | Shared stage entry, validation, linker script, image link, and artifacts |
 | `include/arch/` | Architectural register fields, ABI, and core vector constants |
 | `include/asm/` | Function, constant-load, address, and vector helper macros |
-| `include/library/libc/` | Project-owned size, integer, memory, and string declarations |
+| `include/bit.h` | Bit, contiguous-mask, and register-field helpers |
+| `include/library/libc/` | Project-owned standard C declarations |
 | `driver/console/` | Generic console API and reusable UART IP drivers |
-| `library/libc/` | Freestanding memory and string routines |
+| `library/libc/` | Freestanding formatting, conversion, character, memory, and string routines |
 | `library/runtime/` | Stackless assembly for `.data` copy and `.bss`/stack clearing |
 | `platform/` | Default selection, CPU models, devices, IRQs, and execution backends |
 | `cmake/` | Generic configuration, toolchains, editor setup, and artifact exporter |
@@ -464,16 +494,29 @@ to `__stack_top` and calls `boot_main()`. No C code runs before initialization.
 Default exception handlers wait without using a stack, preserving fault state
 for GDB. The console API offers initialization, character/string output, and
 hexadecimal formatting. `console_puts` converts LF to CRLF; `console_putc` emits
-the byte unchanged. The libc subset provides `memcpy`, `memmove`, `memset`,
-`memcmp`, and `strlen`; use `memmove` for overlapping buffers.
+the byte unchanged. The project-owned libc provides basic memory and string
+operations, ASCII character classification, `strtol`/`strtoul`, and integer,
+pointer, character, and string formatting through the `printf`, `sprintf`, and
+`snprintf` families. Console formatting writes through `console_putc`; buffer
+formatting has no driver dependency. Compiler-specific attributes are isolated
+in `compiler_rt.h`.
+
+The project-owned `<stddef.h>` provides `offsetof()`. Runtime invariants use
+`assert(condition)` or `assert_msg(condition, "message")` from the project-owned
+`<assert.h>`. These macros call the separate `panic()` or `panic_msg()` entry
+points. A panic marks `boot_status` as failed, prints the expression, optional
+message, source location, and architecture-specific register state, then halts
+with interrupts masked. Assertions remain enabled in Release builds. AArch64
+and AArch32 report their current processor, vector, and fault state; Cortex-M
+additionally reports SCB fault status and fault addresses.
 
 ### Adding a platform
 
 Create `platform/<vendor>/<board>/` with `platform.cmake`, `CMakeLists.txt`,
 `KConfig`, architecture-specific files under `configs/`, a console binding, and
-platform headers. Add the vendor and board symbols to their parent `KConfig`
-files, then select them with `add_subdirectory_if_enabled` in the corresponding
-parent `CMakeLists.txt`.
+platform headers. Shared bindings may live in a vendor directory. Add the vendor
+and board symbols to their parent `KConfig` files, then select them with
+`add_subdirectory_if_enabled` in the corresponding parent `CMakeLists.txt`.
 
 Define `BOOT_SUPPORTED_ARCHS`, `BOOT_CPU_FLAGS`, and `BOOT_CONSOLE_DRIVER`.
 Optionally supply `BOOT_PLATFORM_TARGETS`, a CMake file defining `run` and `debug`.
@@ -483,14 +526,13 @@ and allowed ranges belong in `platform_memory.h`. See the
 [Platform contract](platform/README.md#platform-contract) for included examples.
 
 Shared runtime validation is implemented in [common.c](boot/common.c). The common
-[boot entry](boot/main.c) selects the stage behavior from `BOOT_STAGE` and calls
-weak platform hooks declared in [platform.h](include/platform.h):
-`platform_early_init()`, `platform_arch_init()`, and `platform_init()`. A platform
-can override those hooks with normal strong definitions and can add stage-specific
-sources from `platform.cmake` with `BOOT_PLATFORM_STAGE1_SOURCES` or
-`BOOT_PLATFORM_STAGE2_SOURCES`. Architecture-specific `boot_jump()`
-implementations perform the final register and vector-table handoff. Interrupt support
-requires controller/peripheral initialization, unmasking, and appropriate context
+[boot entry](boot/main.c) is image-agnostic and calls weak platform hooks declared
+in [platform.h](include/platform.h): `platform_early_init()`,
+`platform_arch_init()`, `platform_init()`, and `platform_handoff()`. Configuration
+and platform sources select image-specific memory, identity, initialization, and
+handoff behavior. Architecture-specific `boot_jump()` implementations perform the
+final register and vector-table handoff. Interrupt support requires
+controller/peripheral initialization, unmasking, and appropriate context
 save/restore. Default handlers provide fault inspection rather than a scheduler.
 ### Assembly macros
 

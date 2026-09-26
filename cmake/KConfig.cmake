@@ -6,6 +6,8 @@
 
 # KConfig generation ---------------------------------------------------------
 function(boot_load_kconfig)
+    # KConfig output is generated during configure so all later CMake files see
+    # ordinary CONFIG_* variables and target compilation sees autoconf.h.
     find_program(Python3_EXECUTABLE NAMES python3 python)
     if(NOT Python3_EXECUTABLE)
         message(FATAL_ERROR "Python is required to parse KConfig files")
@@ -55,6 +57,8 @@ define_property(DIRECTORY PROPERTY BOOT_SOURCE_TARGET INHERITED
 )
 
 function(boot_require_directory directory)
+    # Enabled source directories must participate in both configuration and
+    # target composition; accepting only one file usually hides a porting typo.
     if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${directory}/CMakeLists.txt")
         message(FATAL_ERROR "Missing ${directory}/CMakeLists.txt")
     endif()

@@ -6,8 +6,6 @@
  * Brief: Define ARMv7-M reset, vectors, and default exception handling.
  */
 
-/* ARMv7-M reset and exception vectors. */
-
 /* Includes --------------------------------------------------------------- */
 #include "asm/asm_macros.S"
 #include "platform_def.h"
@@ -19,10 +17,12 @@
 /* Exception vector table ------------------------------------------------- */
 .section .vectors, "a", %progbits
 /* The platform supplies the external IRQ count and vector alignment. */
+.set vector_table_size, \
+    (CORTEX_M_CORE_VECTOR_COUNT + PLATFORM_IRQ_COUNT) * CORTEX_M_VECTOR_ENTRY_SIZE
 .if PLATFORM_VECTOR_ALIGNMENT < CORTEX_M_MIN_VECTOR_ALIGNMENT
     .error "Vector alignment is below the architectural minimum"
 .endif
-.if PLATFORM_VECTOR_ALIGNMENT < ((CORTEX_M_CORE_VECTOR_COUNT + PLATFORM_IRQ_COUNT) * CORTEX_M_VECTOR_ENTRY_SIZE)
+.if PLATFORM_VECTOR_ALIGNMENT < vector_table_size
     .error "Vector alignment must cover the complete table"
 .endif
 .balign PLATFORM_VECTOR_ALIGNMENT
@@ -45,7 +45,7 @@ vector_table:
     .irp irq, PLATFORM_IRQ_NUMBERS
     vector_handler IRQ\irq\()_Handler
     .endr
-.if (. - vector_table) != ((CORTEX_M_CORE_VECTOR_COUNT + PLATFORM_IRQ_COUNT) * CORTEX_M_VECTOR_ENTRY_SIZE)
+.if (. - vector_table) != vector_table_size
     .error "Vector count does not match the platform IRQ configuration"
 .endif
 .size vector_table, . - vector_table

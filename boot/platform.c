@@ -8,16 +8,25 @@
 
 /* Includes --------------------------------------------------------------- */
 #include "platform.h"
+#include "compiler_rt.h"
 
 /* Weak platform hooks ---------------------------------------------------- */
-__attribute__((weak)) void platform_early_init(void)
+/*
+ * Keep these external definitions in one translation unit. Header-local
+ * functions cannot be replaced reliably by a platform's strong definition.
+ */
+COMPILER_WEAK void platform_early_init(void)
 {
 }
 
-__attribute__((weak)) void platform_arch_init(void)
+COMPILER_WEAK void platform_arch_init(void)
 {
 }
 
-__attribute__((weak)) void platform_init(void)
+COMPILER_WEAK void platform_init(void)
+{
+}
+
+COMPILER_WEAK void platform_handoff(void)
 {
 }

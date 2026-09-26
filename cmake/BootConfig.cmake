@@ -22,13 +22,15 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 endif()
 
-# Compilation database ------------------------------------------------------
-if(NOT DEFINED CMAKE_EXPORT_COMPILE_COMMANDS OR CMAKE_EXPORT_COMPILE_COMMANDS STREQUAL "")
+# Compilation database -------------------------------------------------------
+if(NOT DEFINED CMAKE_EXPORT_COMPILE_COMMANDS OR
+   CMAKE_EXPORT_COMPILE_COMMANDS STREQUAL "")
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "Export compiler commands" FORCE)
 endif()
 
 # Build-directory architecture check -----------------------------------------
-if(DEFINED BOOT_CONFIGURED_ARCH AND NOT BOOT_CONFIGURED_ARCH STREQUAL BOOT_ARCH)
+if(DEFINED BOOT_CONFIGURED_ARCH AND
+   NOT BOOT_CONFIGURED_ARCH STREQUAL BOOT_ARCH)
     message(FATAL_ERROR "Use a separate build directory for each BOOT_ARCH")
 endif()
 set(BOOT_CONFIGURED_ARCH "${BOOT_ARCH}" CACHE INTERNAL "Architecture of this build directory")
@@ -37,11 +39,25 @@ set(BOOT_CONFIGURED_ARCH "${BOOT_ARCH}" CACHE INTERNAL "Architecture of this bui
 set(BOOT_MEMORY_CONFIG "" CACHE FILEPATH "Optional header overriding memory boundaries")
 set(BOOT_PAYLOAD_IMAGE "" CACHE FILEPATH "Optional U-Boot or kernel image")
 set(BOOT_PAYLOAD_FORMAT raw CACHE STRING "Payload image format: raw or elf")
+set(BOOT_MULTIBUILD_ROOT "" CACHE PATH "Parent directory containing BL1 and BL2 builds")
+set(BOOT_BL1_BUILD_DIR "" CACHE PATH "Configured BL1 build directory")
+set(BOOT_BL2_BUILD_DIR "" CACHE PATH "Configured BL2 build directory")
 set_property(CACHE BOOT_PAYLOAD_FORMAT PROPERTY STRINGS raw elf)
+if(BOOT_MULTIBUILD_ROOT)
+    if(NOT BOOT_BL1_BUILD_DIR)
+        set(BOOT_BL1_BUILD_DIR "${BOOT_MULTIBUILD_ROOT}/bl1")
+    endif()
+    if(NOT BOOT_BL2_BUILD_DIR)
+        set(BOOT_BL2_BUILD_DIR "${BOOT_MULTIBUILD_ROOT}/bl2")
+    endif()
+endif()
 
 # Board configuration selection ----------------------------------------------
 set(BOOT_PLATFORM "" CACHE STRING "Platform directory under platform/")
 set(BOOT_CONFIG "" CACHE STRING "Comma-separated board configuration file names")
+set(BOOT_CONFIG_APPEND "" CACHE STRING
+    "Comma-separated image configuration files appended to BOOT_CONFIG"
+)
 if(BOOT_CONFIG MATCHES "[/\\]")
     if(DEFINED BOOT_CONFIGURED_PLATFORM)
         get_filename_component(BOOT_CONFIG "${BOOT_CONFIG}" NAME)
@@ -85,29 +101,61 @@ else()
     endif()
     set(boot_config_names "${boot_config_name}")
 endif()
+set(boot_base_config_names ${boot_config_names})
+if(BOOT_CONFIG_APPEND)
+    string(REPLACE "," ";" boot_config_append_names "${BOOT_CONFIG_APPEND}")
+    string(REGEX REPLACE "[ \t]+" ";" boot_config_append_names
+        "${boot_config_append_names}"
+    )
+    list(FILTER boot_config_append_names EXCLUDE REGEX "^$")
+    list(APPEND boot_config_names ${boot_config_append_names})
+endif()
 set(BOOT_CONFIG_FILES)
 foreach(boot_config_name IN LISTS boot_config_names)
     if(NOT boot_config_name MATCHES "^[A-Za-z0-9][A-Za-z0-9_.-]*$")
         message(FATAL_ERROR "Invalid BOOT_CONFIG file name: ${boot_config_name}")
     endif()
-    set(boot_config_file "${boot_config_directory}/${boot_config_name}")
-    if(NOT EXISTS "${boot_config_file}")
-        message(FATAL_ERROR "Board configuration not found: ${boot_config_file}")
+    set(boot_board_config_file
+        "${boot_config_directory}/${boot_config_name}"
+    )
+    set(boot_common_config_file
+        "${CMAKE_CURRENT_SOURCE_DIR}/configs/${boot_config_name}"
+    )
+    if(EXISTS "${boot_board_config_file}")
+        set(boot_config_file "${boot_board_config_file}")
+    elseif(EXISTS "${boot_common_config_file}")
+        set(boot_config_file "${boot_common_config_file}")
+    else()
+        message(FATAL_ERROR
+            "Configuration ${boot_config_name} was not found in "
+            "${boot_config_directory} or ${CMAKE_CURRENT_SOURCE_DIR}/configs"
+        )
     endif()
     list(APPEND BOOT_CONFIG_FILES "${boot_config_file}")
 endforeach()
-list(JOIN boot_config_names "," BOOT_CONFIG)
+list(JOIN boot_base_config_names "," BOOT_CONFIG)
 set(BOOT_CONFIG "${BOOT_CONFIG}" CACHE STRING
     "Comma-separated board configuration file names" FORCE
 )
+list(JOIN boot_config_names "," BOOT_EFFECTIVE_CONFIG)
 set(BOOT_LOCAL_CONFIG_FILE "${CMAKE_BINARY_DIR}/kconfig.fragment")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/KConfig.cmake")
 boot_load_kconfig()
 
-# Payload configuration -----------------------------------------------------
-if(CONFIG_BOOT AND (NOT CONFIG_BOOTLOADER1 OR NOT CONFIG_BOOTLOADER2))
-    message(FATAL_ERROR "CONFIG_BOOT requires bootloader1 and bootloader2")
+# Boot image selection -------------------------------------------------------
+set(boot_image_config_count 0)
+foreach(boot_image_option IN ITEMS CONFIG_BOOTLOADER1 CONFIG_BOOTLOADER2)
+    if(${boot_image_option})
+        math(EXPR boot_image_config_count "${boot_image_config_count} + 1")
+    endif()
+endforeach()
+if(CONFIG_BOOT AND NOT boot_image_config_count EQUAL 1)
+    message(FATAL_ERROR
+        "CONFIG_BOOT requires exactly one of CONFIG_BOOTLOADER1 or CONFIG_BOOTLOADER2"
+    )
 endif()
+
+# Payload configuration ------------------------------------------------------
 if(CONFIG_BOOTLOADER2_AUTO_BOOT AND CONFIG_PAYLOAD_ENTRY_ADDRESS STREQUAL "0")
     message(FATAL_ERROR
         "CONFIG_PAYLOAD_ENTRY_ADDRESS must be nonzero when payload handoff is enabled"
@@ -148,7 +196,7 @@ if(NOT EXISTS "${BOOT_PLATFORM_DIR}/platform.cmake")
     message(FATAL_ERROR "Platform not found: ${BOOT_PLATFORM_DIR}/platform.cmake")
 endif()
 
-# Configuration consistency checks ------------------------------------------
+# Configuration consistency checks -------------------------------------------
 string(TOUPPER "${BOOT_ARCH}" boot_arch_config_suffix)
 string(REPLACE "-" "_" boot_arch_config_suffix "${boot_arch_config_suffix}")
 set(boot_arch_config "CONFIG_ARCH_${boot_arch_config_suffix}")
@@ -214,16 +262,23 @@ if(NOT BOOT_ARCH IN_LIST BOOT_SUPPORTED_ARCHS)
         "supported: ${BOOT_SUPPORTED_ARCHS}"
     )
 endif()
-if(DEFINED BOOT_CONFIGURED_PLATFORM AND NOT BOOT_CONFIGURED_PLATFORM STREQUAL BOOT_PLATFORM)
+if(DEFINED BOOT_CONFIGURED_PLATFORM AND
+   NOT BOOT_CONFIGURED_PLATFORM STREQUAL BOOT_PLATFORM)
     message(FATAL_ERROR "Use a separate build directory for each BOOT_PLATFORM")
 endif()
-set(BOOT_CONFIGURED_PLATFORM "${BOOT_PLATFORM}" CACHE INTERNAL "Platform of this build directory")
-message(STATUS "Boot platform: ${BOOT_PLATFORM} (${BOOT_ARCH}), console: ${BOOT_CONSOLE_DRIVER}")
-message(STATUS "Boot configurations: ${BOOT_CONFIG}")
+set(BOOT_CONFIGURED_PLATFORM "${BOOT_PLATFORM}" CACHE INTERNAL
+    "Platform of this build directory"
+)
+message(STATUS
+    "Boot platform: ${BOOT_PLATFORM} (${BOOT_ARCH}), console: ${BOOT_CONSOLE_DRIVER}"
+)
+message(STATUS "Boot configurations: ${BOOT_EFFECTIVE_CONFIG}")
 
 # Debugger option ------------------------------------------------------------
 set(BOOT_GDB_PORT "${CONFIG_GDB_PORT}")
-if(NOT BOOT_GDB_PORT MATCHES "^[0-9]+$" OR BOOT_GDB_PORT LESS 1 OR BOOT_GDB_PORT GREATER 65535)
+if(NOT BOOT_GDB_PORT MATCHES "^[0-9]+$" OR
+   BOOT_GDB_PORT LESS 1 OR
+   BOOT_GDB_PORT GREATER 65535)
     message(FATAL_ERROR "BOOT_GDB_PORT must be between 1 and 65535")
 endif()
 

@@ -11,16 +11,17 @@
 
 /* Includes --------------------------------------------------------------- */
 #include "arch/arch_def.h"
-#include "boot_stage.h"
+#include "compiler_rt.h"
 
 /* Macro definitions ------------------------------------------------------ */
-#define MEMORY_REGION_ALIGNMENT  16
-#define MEMORY_REGION_ALIGN_MASK (MEMORY_REGION_ALIGNMENT - 1)
+#define MEMORY_REGION_ALIGNMENT  U(16)
+#define MEMORY_REGION_ALIGN_MASK (MEMORY_REGION_ALIGNMENT - U(1))
 
 /*
- * Shared by C, assembly, and GNU ld; all addresses belong to the platform. Use integer
- * expressions without C suffixes, casts, or sizeof. Ends are exclusive; STACK_START is
- * the initial SP of the descending stack.
+ * Shared by C, assembly, and GNU ld; all addresses belong to the platform. U(), UL(),
+ * and ULL() add C suffixes only for C compilation and become plain constants for
+ * assembler and linker preprocessing. Ends are exclusive; STACK_START is the initial
+ * SP of the descending stack.
  */
 
 /* Platform header selection ---------------------------------------------- */

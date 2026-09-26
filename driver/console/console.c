@@ -8,11 +8,13 @@
 
 /* Includes --------------------------------------------------------------- */
 #include "driver/console.h"
+#include "bit.h"
+#include <stdio.h>
 
 /* Macro definitions ------------------------------------------------------ */
-#define CONSOLE_BITS_PER_BYTE  8
-#define CONSOLE_HEX_DIGIT_BITS 4
-#define CONSOLE_HEX_DIGIT_MASK ((1 << CONSOLE_HEX_DIGIT_BITS) - 1)
+#define CONSOLE_BITS_PER_BYTE  U(8)
+#define CONSOLE_HEX_DIGIT_BITS U(4)
+#define CONSOLE_HEX_DIGIT_MASK GENMASK32(U(3), U(0))
 
 /* Public API ------------------------------------------------------------- */
 void console_init(void)
@@ -38,10 +40,20 @@ void console_puts(const char *text)
 void console_hex(uintptr_t value)
 {
     static const char digits[] = "0123456789abcdef";
+    uint32_t shift;
 
     console_puts("0x");
-    for (unsigned int shift = sizeof(value) * CONSOLE_BITS_PER_BYTE; shift != 0;) {
+    for (shift = sizeof(value) * CONSOLE_BITS_PER_BYTE; shift != U(0);) {
         shift -= CONSOLE_HEX_DIGIT_BITS;
         console_putc(digits[(value >> shift) & CONSOLE_HEX_DIGIT_MASK]);
     }
+}
+
+int putchar(int character)
+{
+    if (character == '\n') {
+        console_putc('\r');
+    }
+    console_putc((char)character);
+    return (unsigned char)character;
 }

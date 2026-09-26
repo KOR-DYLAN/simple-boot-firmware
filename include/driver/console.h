@@ -10,10 +10,11 @@
 #define SIMPLE_BOOT_CONSOLE_H
 
 /* Includes --------------------------------------------------------------- */
-#include "stdint.h"
+#include <stdint.h>
+#include "compiler_rt.h"
 
 /* Macro definitions ------------------------------------------------------ */
-#define CONSOLE_BAUD_ROUNDING_DENOMINATOR 2
+#define CONSOLE_BAUD_ROUNDING_DENOMINATOR U(2)
 
 /* Type declarations ------------------------------------------------------ */
 struct console_device;

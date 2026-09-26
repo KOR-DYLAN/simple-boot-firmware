@@ -20,6 +20,8 @@ typedef __INT64_TYPE__ int64_t;
 typedef __UINT64_TYPE__ uint64_t;
 typedef __INTPTR_TYPE__ intptr_t;
 typedef __UINTPTR_TYPE__ uintptr_t;
+typedef __INTMAX_TYPE__ intmax_t;
+typedef __UINTMAX_TYPE__ uintmax_t;
 
 /* Limit macros ----------------------------------------------------------- */
 #define INT8_MIN    (-__INT8_MAX__ - 1)
@@ -37,5 +39,8 @@ typedef __UINTPTR_TYPE__ uintptr_t;
 #define INTPTR_MIN  (-__INTPTR_MAX__ - 1)
 #define INTPTR_MAX  __INTPTR_MAX__
 #define UINTPTR_MAX __UINTPTR_MAX__
+#define INTMAX_MIN  (-__INTMAX_MAX__ - 1)
+#define INTMAX_MAX  __INTMAX_MAX__
+#define UINTMAX_MAX __UINTMAX_MAX__
 
 #endif /* SIMPLE_BOOT_STDINT_H */

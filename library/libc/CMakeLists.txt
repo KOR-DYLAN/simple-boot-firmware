@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: MIT
 #
 # File: library/libc/CMakeLists.txt
-# Brief: Add freestanding memory and string routines to the library.
+# Brief: Add the freestanding standard C subset to the library.
 
 # Library sources ------------------------------------------------------------
-add_source_if_enabled(CONFIG_LIBC string.c)
+add_source_if_enabled(CONFIG_LIBC ctype.c stdio.c stdlib.c string.c)
 
 # Freestanding implementation options ----------------------------------------
 # Keep GCC from replacing these loops with recursive libc calls.

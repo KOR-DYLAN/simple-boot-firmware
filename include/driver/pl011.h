@@ -11,12 +11,13 @@
 
 /* Includes --------------------------------------------------------------- */
 #include "driver/console.h"
+#include "bit.h"
 
 /* Macro definitions ------------------------------------------------------ */
-#define PL011_BAUD_OVERSAMPLE     16
-#define PL011_BAUD_FRACTION_BITS  6
-#define PL011_BAUD_FRACTION_SCALE (1 << PL011_BAUD_FRACTION_BITS)
-#define PL011_BAUD_FRACTION_MASK  (PL011_BAUD_FRACTION_SCALE - 1)
+#define PL011_BAUD_OVERSAMPLE     U(16)
+#define PL011_BAUD_FRACTION_BITS  U(6)
+#define PL011_BAUD_FRACTION_SCALE BIT32(PL011_BAUD_FRACTION_BITS)
+#define PL011_BAUD_FRACTION_MASK  GENMASK32(PL011_BAUD_FRACTION_BITS - U(1), U(0))
 #define PL011_BAUD_CLOCK_SCALE    (PL011_BAUD_FRACTION_SCALE / PL011_BAUD_OVERSAMPLE)
 
 /* Driver operations ------------------------------------------------------ */

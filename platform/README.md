@@ -17,7 +17,8 @@ MPS2 AN385 provides `cortex-m_defconfig`. CMake discovers the single matching
 default file for the selected architecture and reads the platform name from its
 `CONFIG_PLATFORM_NAME` value. No common file contains a default board list.
 When `BOOT_PLATFORM` is explicit, `BOOT_CONFIG` names a file directly under that
-board's `configs/` directory and must not contain directory components. Multiple
+board's `configs/` directory or the root `configs/` directory and must not
+contain directory components. Board-local files take precedence. Multiple
 comma-separated names are merged from left to right.
 
 Install QEMU on Ubuntu/Debian with:
@@ -132,7 +133,7 @@ A platform directory contains:
 - `platform.cmake`: supported architectures, CPU flags, console driver, and
   optional `BOOT_PLATFORM_TARGETS` execution-hook path.
 - `CMakeLists.txt`: sources contributed to the aggregate `libdriver` target.
-- `console.c`: console device binding.
+- A console device binding, which may be shared from the vendor directory.
 - `include/platform_def.h`: device parameters and external IRQ configuration.
 - `include/platform_memory.h`: memory boundaries and permitted ranges.
 
@@ -140,10 +141,18 @@ For the QEMU backend, `platform.cmake` also sets `BOOT_QEMU_NAME`,
 `BOOT_QEMU_ARGS`, and `BOOT_QEMU_LOAD_MODE` (`loader`, `kernel`, or `bios`). Other
 platforms can supply their own execution hook without depending on QEMU.
 
-Boot stage entry code is shared by the core boot layer. Platforms may override
-the weak `platform_early_init()`, `platform_arch_init()`, and `platform_init()`
-hooks from their own sources. Add sources common to both stage images with
-`BOOT_PLATFORM_SOURCES`, or add stage-specific implementations with
+Boot image entry code is shared by the core boot layer and does not distinguish
+between stages. Platforms may override the weak `platform_early_init()`,
+`platform_arch_init()`, `platform_init()`, and `platform_handoff()` hooks from
+their own sources. Add sources common to both images with `BOOT_PLATFORM_SOURCES`,
+or add stage-specific implementations with
 `BOOT_PLATFORM_STAGE1_SOURCES` and `BOOT_PLATFORM_STAGE2_SOURCES` in
 `platform.cmake`. `BOOT_PLATFORM_BL1_SOURCES` and `BOOT_PLATFORM_BL2_SOURCES`
 are accepted aliases for platforms that prefer BL naming.
+
+The root `configs/bl1.config` and `configs/bl2.config` files are the default
+named configurations and select the image role. Additional names may provide
+other independent configurations. The Makefile applies each named config and
+its fragments in a separate CMake build directory, so generated headers,
+libraries, and object files are private to one configuration. A platform shall
+not rely on objects being reused between configurations.

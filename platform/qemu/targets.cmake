@@ -8,6 +8,8 @@
 find_program(BOOT_QEMU NAMES "${BOOT_QEMU_NAME}")
 
 # QEMU image and execution arguments -----------------------------------------
+# BIOS mode consumes the combined flat image. Kernel and loader modes retain
+# separate ELF files so QEMU can place sparse images and preserve symbols.
 list(APPEND BOOT_QEMU_ARGS
     -accel tcg
     -display none -monitor none -serial stdio
@@ -29,8 +31,13 @@ if(NOT BOOT_QEMU_LOAD_MODE STREQUAL "bios")
 endif()
 if(BOOT_PAYLOAD_IMAGE)
     if(BOOT_PAYLOAD_FORMAT STREQUAL "raw")
+        string(CONCAT boot_payload_loader
+            "loader,file=${BOOT_PAYLOAD_IMAGE}"
+            ",addr=${CONFIG_PAYLOAD_LOAD_ADDRESS}"
+            ",force-raw=on"
+        )
         list(APPEND BOOT_QEMU_ARGS
-            -device "loader,file=${BOOT_PAYLOAD_IMAGE},addr=${CONFIG_PAYLOAD_LOAD_ADDRESS},force-raw=on"
+            -device "${boot_payload_loader}"
         )
     else()
         list(APPEND BOOT_QEMU_ARGS -device "loader,file=${BOOT_PAYLOAD_IMAGE}")

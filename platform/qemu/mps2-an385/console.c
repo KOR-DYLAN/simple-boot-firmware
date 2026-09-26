@@ -7,15 +7,21 @@
  */
 
 /* Includes --------------------------------------------------------------- */
+#include "compiler_rt.h"
 #include "driver/cmsdk_apb_uart.h"
 #include "platform_def.h"
 
 /* Configuration checks --------------------------------------------------- */
-_Static_assert(PLATFORM_UART_BAUDRATE > 0 && PLATFORM_UART_CLOCK_HZ > 0,
-               "UART clock and baud rate must be nonzero");
-_Static_assert(PLATFORM_UART_CLOCK_HZ <=
-               UINT32_MAX - PLATFORM_UART_BAUDRATE / CONSOLE_BAUD_ROUNDING_DENOMINATOR,
-               "CMSDK baud divider arithmetic overflow");
+COMPILER_STATIC_ASSERT(
+    ((PLATFORM_UART_BAUDRATE > 0) && (PLATFORM_UART_CLOCK_HZ > 0)),
+    "UART clock and baud rate must be nonzero"
+);
+COMPILER_STATIC_ASSERT(
+    (PLATFORM_UART_CLOCK_HZ <=
+     (UINT32_MAX - (PLATFORM_UART_BAUDRATE /
+                    CONSOLE_BAUD_ROUNDING_DENOMINATOR))),
+    "CMSDK baud divider arithmetic overflow"
+);
 
 /* Platform console binding ----------------------------------------------- */
 const struct console_device platform_console = {

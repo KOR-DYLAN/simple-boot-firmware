@@ -16,21 +16,23 @@ import kconfig
 
 # Menu operations ------------------------------------------------------------
 def disable_dependents(symbols, values, name):
+    """Disable boolean symbols made unreachable by turning off one symbol."""
     changed = True
+    values[name] = False
     while changed:
         changed = False
         for dependent, symbol in symbols.items():
-            if symbol.dependency == name and values[dependent]:
-                if symbol.kind == "bool":
-                    values[dependent] = False
-                    changed = True
-            if symbol.dependency and not values[symbol.dependency] and values[dependent]:
-                if symbol.kind == "bool":
-                    values[dependent] = False
-                    changed = True
+            dependency_disabled = (
+                symbol.dependency and not values[symbol.dependency]
+            )
+            if (symbol.kind == "bool" and values[dependent]
+                    and dependency_disabled):
+                values[dependent] = False
+                changed = True
 
 
 def render_value(symbol, value):
+    """Format one effective value for the menu and detail panel."""
     if symbol.kind == "bool":
         return "[*]" if value else "[ ]"
     if symbol.kind == "string":
@@ -41,6 +43,7 @@ def render_value(symbol, value):
 
 
 def symbol_group(source_dir, symbol):
+    """Use the defining directory as the symbol's visible menu group."""
     try:
         relative = symbol.path.relative_to(source_dir)
     except ValueError:
@@ -52,6 +55,7 @@ def symbol_group(source_dir, symbol):
 
 
 def symbol_location(source_dir, symbol):
+    """Prefer a source-relative location for the detail panel."""
     try:
         return symbol.path.relative_to(source_dir)
     except ValueError:
@@ -59,6 +63,7 @@ def symbol_location(source_dir, symbol):
 
 
 def build_entries(source_dir, symbols):
+    """Interleave directory headings with source-ordered symbol entries."""
     entries = []
     last_group = None
     ordered_symbols = sorted(
@@ -75,10 +80,12 @@ def build_entries(source_dir, symbols):
 
 
 def selectable_indices(entries):
+    """Return menu indices that represent editable symbols."""
     return [index for index, entry in enumerate(entries) if entry[0] == "symbol"]
 
 
 def next_selectable(entries, selected, step):
+    """Move one direction without landing on a group heading."""
     index = selected + step
     while 0 <= index < len(entries):
         if entries[index][0] == "symbol":
@@ -88,6 +95,7 @@ def next_selectable(entries, selected, step):
 
 
 def clamp_selectable(entries, selected):
+    """Clamp page movement to the nearest editable entry."""
     if entries[selected][0] == "symbol":
         return selected
     for index in range(selected + 1, len(entries)):
@@ -100,12 +108,14 @@ def clamp_selectable(entries, selected):
 
 
 def color_pair(pair):
+    """Return a color pair only when the terminal supports colors."""
     if curses.has_colors():
         return curses.color_pair(pair)
     return curses.A_NORMAL
 
 
 def draw_text(screen, row, column, text, width, attributes=curses.A_NORMAL):
+    """Clip terminal output and tolerate writes at a resized screen edge."""
     if width <= 0:
         return
     try:
@@ -115,12 +125,14 @@ def draw_text(screen, row, column, text, width, attributes=curses.A_NORMAL):
 
 
 def draw_bar(screen, row, text, attributes):
+    """Draw one full-width status or key-help bar."""
     height, width = screen.getmaxyx()
     if 0 <= row < height:
         draw_text(screen, row, 0, text.ljust(width), max(1, width - 1), attributes)
 
 
 def edit_value(screen, symbol, current, row):
+    """Read and validate a non-boolean value on the status line."""
     height, width = screen.getmaxyx()
     prompt = "CONFIG_{}: ".format(symbol.name)
     screen.move(height - 2, 0)
@@ -137,6 +149,7 @@ def edit_value(screen, symbol, current, row):
 
 
 def draw_help(screen, source_dir, symbol, values, top, left, height, width):
+    """Draw the selected symbol's definition and dependency details."""
     if width < 12:
         return
     panel_attr = color_pair(4)
@@ -168,6 +181,7 @@ def draw_help(screen, source_dir, symbol, values, top, left, height, width):
 
 
 def menu(screen, source_dir, symbols, values):
+    """Run the nconfig-style editor and return whether changes should save."""
     entries = build_entries(source_dir, symbols)
     selectable = selectable_indices(entries)
     if not selectable:
@@ -192,6 +206,7 @@ def menu(screen, source_dir, symbols, values):
         pass
     screen.keypad(True)
     while True:
+        # Derive the viewport on every iteration so terminal resize is safe.
         height, width = screen.getmaxyx()
         if height < 8 or width < 48:
             screen.erase()
@@ -214,6 +229,8 @@ def menu(screen, source_dir, symbols, values):
                     break
         detail_width = max(24, min(44, width // 3))
         list_width = width - detail_width - 1
+
+        # Paint a complete frame to avoid stale text after resize or scrolling.
         screen.erase()
         draw_bar(screen, 0, " simple-boot nconfig", color_pair(1) | curses.A_BOLD)
         draw_bar(screen, 1, " " + status, color_pair(6))
@@ -251,6 +268,8 @@ def menu(screen, source_dir, symbols, values):
                  "  <PgUp/PgDn> Page  <Home/End> Top/Bottom",
                  color_pair(1))
         screen.refresh()
+
+        # Key dispatch mutates only selection, values, status, or save intent.
         key = screen.getch()
         if key in (curses.KEY_UP, ord("k")):
             selected = next_selectable(entries, selected, -1)
@@ -290,6 +309,7 @@ def menu(screen, source_dir, symbols, values):
 
 # Command-line entry ---------------------------------------------------------
 def main():
+    """Load merged configuration, run the editor, and save local changes."""
     parser = argparse.ArgumentParser(description="Edit simple-boot configuration.")
     parser.add_argument("--source-dir", type=Path, required=True)
     parser.add_argument("--kconfig", type=Path, required=True)

@@ -7,6 +7,6 @@
 # Library target -------------------------------------------------------------
 add_library_if_enabled(
     CONFIG_ARCH_AARCH64 boot_arch OBJECT
-    startup.S vectors.S handoff.S
+    startup.S vectors.S handoff.S panic.c
 )
 target_link_libraries_if_enabled(CONFIG_ARCH_AARCH64 boot_arch PRIVATE boot_options)

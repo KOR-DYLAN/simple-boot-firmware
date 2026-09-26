@@ -28,6 +28,7 @@ endif()
 set(BOOT_INCLUDE_DIRS
     "${BOOT_KCONFIG_OUTPUT_DIR}"
     "${BOOT_PLATFORM_DIR}/include"
+    ${BOOT_PLATFORM_INCLUDE_DIRS}
     "${PROJECT_SOURCE_DIR}/include"
     "${PROJECT_SOURCE_DIR}/include/library/libc"
 )
@@ -41,10 +42,11 @@ endif()
 add_library(boot_options INTERFACE)
 target_include_directories(boot_options INTERFACE ${BOOT_INCLUDE_DIRS})
 target_compile_definitions(boot_options INTERFACE ${BOOT_DEFINES})
-target_compile_features(boot_options INTERFACE c_std_11)
+target_compile_features(boot_options INTERFACE c_std_99)
 target_compile_options(boot_options INTERFACE
     ${BOOT_CPU_FLAGS}
     -include "${BOOT_AUTOCONF_HEADER}"
+    "$<$<COMPILE_LANGUAGE:C>:-std=c99>"
     -g3
     -ffreestanding -fno-builtin -nostdinc
     -fno-stack-protector -fno-pic -fno-pie
@@ -52,6 +54,7 @@ target_compile_options(boot_options INTERFACE
     -ffunction-sections -fdata-sections
     -Wall -Wextra -Werror
     "$<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>"
+    "$<$<COMPILE_LANGUAGE:ASM>:-D__ASSEMBLER__=1>"
 )
 
 # Configuration targets ------------------------------------------------------

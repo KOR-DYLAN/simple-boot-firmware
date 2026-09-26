@@ -11,12 +11,12 @@ config BOOT
 config BOOTLOADER1
     bool "Bootloader1 image"
     depends on BOOT
-    default y
+    default n
 
 config BOOTLOADER2
     bool "Bootloader2 image"
     depends on BOOT
-    default y
+    default n
 
 config BOOTLOADER2_AUTO_BOOT
     bool "Jump from bootloader2 to the payload"

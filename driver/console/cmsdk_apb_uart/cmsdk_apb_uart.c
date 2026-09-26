@@ -8,20 +8,21 @@
 
 /* Includes --------------------------------------------------------------- */
 #include "driver/cmsdk_apb_uart.h"
+#include "bit.h"
 
 /* Register and control macros -------------------------------------------- */
-#define CMSDK_DATA    0x00
-#define CMSDK_STATE   0x04
-#define CMSDK_CTRL    0x08
-#define CMSDK_BAUDDIV 0x10
+#define CMSDK_DATA    U(0x00)
+#define CMSDK_STATE   U(0x04)
+#define CMSDK_CTRL    U(0x08)
+#define CMSDK_BAUDDIV U(0x10)
 
-#define CMSDK_TX_FULL        (1 << 0)
-#define CMSDK_CTRL_DISABLED  0
-#define CMSDK_CTRL_TX_ENABLE (1 << 0)
+#define CMSDK_TX_FULL        BIT32(U(0))
+#define CMSDK_CTRL_DISABLED  U(0)
+#define CMSDK_CTRL_TX_ENABLE BIT32(U(0))
 
 /* Register access helper ------------------------------------------------- */
-static volatile uint32_t *reg(const struct console_device *device,
-                             uintptr_t offset)
+static volatile uint32_t *cmsdk_reg(const struct console_device *device,
+                                   uintptr_t offset)
 {
     return (volatile uint32_t *)(device->base + offset);
 }
@@ -29,19 +30,23 @@ static volatile uint32_t *reg(const struct console_device *device,
 /* Driver implementation -------------------------------------------------- */
 static void cmsdk_init(const struct console_device *device)
 {
-    *reg(device, CMSDK_CTRL) = CMSDK_CTRL_DISABLED;
-    *reg(device, CMSDK_BAUDDIV) =
+    uint32_t baud_divisor;
+
+    baud_divisor =
         (device->clock_hz + device->baudrate / CONSOLE_BAUD_ROUNDING_DENOMINATOR) /
         device->baudrate;
-    *reg(device, CMSDK_CTRL) = CMSDK_CTRL_TX_ENABLE;
+
+    *cmsdk_reg(device, CMSDK_CTRL) = CMSDK_CTRL_DISABLED;
+    *cmsdk_reg(device, CMSDK_BAUDDIV) = baud_divisor;
+    *cmsdk_reg(device, CMSDK_CTRL) = CMSDK_CTRL_TX_ENABLE;
 }
 
 static void cmsdk_putc(const struct console_device *device, char character)
 {
-    while ((*reg(device, CMSDK_STATE) & CMSDK_TX_FULL) != 0) {
+    while ((*cmsdk_reg(device, CMSDK_STATE) & CMSDK_TX_FULL) != U(0)) {
         /* Wait for room in the transmit buffer. */
     }
-    *reg(device, CMSDK_DATA) = (uint32_t)(unsigned char)character;
+    *cmsdk_reg(device, CMSDK_DATA) = (uint32_t)(unsigned char)character;
 }
 
 /* Driver operations ------------------------------------------------------ */

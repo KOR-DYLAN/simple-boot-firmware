@@ -3,50 +3,32 @@
  * SPDX-License-Identifier: MIT
  *
  * File: boot/main.c
- * Brief: Run the selected boot stage and transfer control when configured.
+ * Brief: Initialize the platform and run the configured boot image.
  */
 
 /* Includes --------------------------------------------------------------- */
 #include "boot.h"
-#include "boot_stage.h"
-#include "driver/console.h"
 #include "memory_layout.h"
 #include "platform.h"
 
-/* Stage helpers ---------------------------------------------------------- */
-#if BOOT_STAGE == BOOT_STAGE_1
-#define BOOT_STAGE_NAME "bootloader1"
-#else
-#define BOOT_STAGE_NAME "bootloader2"
-#endif
-
-static void boot_handoff_next(void)
-{
-#if BOOT_STAGE == BOOT_STAGE_1
-    boot_print_handoff("Jump to bootloader2: ", BOOTLOADER2_ENTRY_ADDRESS);
-    boot_jump(BOOTLOADER2_ENTRY_ADDRESS,
-              BOOT_HANDOFF_ARGUMENT_NONE,
-              BOOT_HANDOFF_ARGUMENT_NONE,
-              BOOT_HANDOFF_ARGUMENT_NONE,
-              BOOT_HANDOFF_ARGUMENT_NONE);
-#elif defined(CONFIG_BOOTLOADER2_AUTO_BOOT)
-    boot_print_handoff("Jump to payload: ", CONFIG_PAYLOAD_ENTRY_ADDRESS);
-    boot_jump(CONFIG_PAYLOAD_ENTRY_ADDRESS,
-              CONFIG_PAYLOAD_ARGUMENT_0,
-              CONFIG_PAYLOAD_ARGUMENT_1,
-              CONFIG_PAYLOAD_ARGUMENT_2,
-              CONFIG_PAYLOAD_ARGUMENT_3);
-#else
-    console_puts("Payload handoff disabled\n");
-#endif
-}
-
 /* Boot entry ------------------------------------------------------------- */
+/*
+ * Assembly enters here only after .data, .bss, and the stack are ready.
+ * Platform hooks remain ordered from the least initialized environment to
+ * the final ownership transfer; a later hook may rely on every earlier step.
+ */
 void boot_main(void)
 {
+    /* Perform work required before the common console can be initialized. */
     platform_early_init();
-    boot_stage_run(BOOT_STAGE_NAME);
+
+    /* Initialize diagnostics and validate the C runtime and memory layout. */
+    boot_run(PLATFORM_IMAGE_NAME);
+
+    /* Configure architectural state before board devices and services. */
     platform_arch_init();
     platform_init();
-    boot_handoff_next();
+
+    /* Transfer control when configured, or return to the assembly halt path. */
+    platform_handoff();
 }

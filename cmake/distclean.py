@@ -11,9 +11,8 @@ from pathlib import Path
 import shutil
 
 
-# Build directory cleanup ----------------------------------------------------
-def distclean(source_dir, build_dir):
-    source_dir = source_dir.resolve()
+def validate_build_directory(source_dir, build_dir):
+    """Reject paths that are unsafe or do not belong to this source tree."""
     if build_dir.is_symlink():
         raise ValueError("BUILD_DIR must not be a symbolic link")
     build_dir = build_dir.resolve()
@@ -33,12 +32,11 @@ def distclean(source_dir, build_dir):
         )
         if cache_home is None or Path(cache_home).resolve() != source_dir:
             raise ValueError("BUILD_DIR belongs to a different source directory")
-        shutil.rmtree(build_dir)
-        print(f"Removed {build_dir}")
-    else:
-        print(f"Build directory already absent: {build_dir}")
+    return build_dir
 
-    # Preserve editor selections for other builds and manually authored files.
+
+def remove_editor_selection(source_dir, build_dir):
+    """Remove .clangd only when it selects the deleted build directory."""
     editor = source_dir / ".clangd"
     if editor.is_file() and not editor.is_symlink():
         config = editor.read_text()
@@ -49,8 +47,25 @@ def distclean(source_dir, build_dir):
             print(f"Removed {editor}")
 
 
+# Build directory cleanup ----------------------------------------------------
+def distclean(source_dir, build_dir):
+    """Remove one verified build tree and its generated editor selection."""
+    source_dir = source_dir.resolve()
+    build_dir = validate_build_directory(source_dir, build_dir)
+
+    if build_dir.exists():
+        shutil.rmtree(build_dir)
+        print(f"Removed {build_dir}")
+    else:
+        print(f"Build directory already absent: {build_dir}")
+
+    # Preserve editor selections for other builds and manually authored files.
+    remove_editor_selection(source_dir, build_dir)
+
+
 # Command-line entry ---------------------------------------------------------
 def main():
+    """Parse cleanup paths and report validation failures without a traceback."""
     parser = argparse.ArgumentParser(
         description="Remove a project build directory and its generated editor selection."
     )

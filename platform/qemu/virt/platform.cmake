@@ -8,6 +8,10 @@
 set(BOOT_SUPPORTED_ARCHS aarch64 aarch32)
 set(BOOT_CONSOLE_DRIVER pl011)
 set(BOOT_QEMU_LOAD_MODE loader)
+set(BOOT_PLATFORM_SOURCES "${CMAKE_CURRENT_LIST_DIR}/../handoff.c")
+set(BOOT_PLATFORM_INCLUDE_DIRS "${CMAKE_CURRENT_LIST_DIR}/../include")
+set(BOOT_PLATFORM_IMAGE1_DEFINES PLATFORM_IMAGE=1)
+set(BOOT_PLATFORM_IMAGE2_DEFINES PLATFORM_IMAGE=2)
 
 # Architecture-specific CPU settings -----------------------------------------
 if(BOOT_ARCH STREQUAL "aarch64")

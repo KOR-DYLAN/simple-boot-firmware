@@ -7,6 +7,10 @@
 # Platform capabilities ------------------------------------------------------
 set(BOOT_SUPPORTED_ARCHS cortex-m)
 set(BOOT_CONSOLE_DRIVER cmsdk_apb_uart)
+set(BOOT_PLATFORM_SOURCES "${CMAKE_CURRENT_LIST_DIR}/../handoff.c")
+set(BOOT_PLATFORM_INCLUDE_DIRS "${CMAKE_CURRENT_LIST_DIR}/../include")
+set(BOOT_PLATFORM_IMAGE1_DEFINES PLATFORM_IMAGE=1)
+set(BOOT_PLATFORM_IMAGE2_DEFINES PLATFORM_IMAGE=2)
 
 # CPU compilation options ----------------------------------------------------
 set(BOOT_CPU_FLAGS -mcpu=cortex-m3 -mthumb -mfloat-abi=soft -mno-unaligned-access)

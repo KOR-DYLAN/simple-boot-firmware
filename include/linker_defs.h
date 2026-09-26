@@ -9,9 +9,11 @@
 #ifndef SIMPLE_BOOT_LINKER_DEFS_H
 #define SIMPLE_BOOT_LINKER_DEFS_H
 
+#include "compiler_rt.h"
+
 /* Macro definitions ------------------------------------------------------ */
-#define ELF_SEGMENT_EXECUTE 1
-#define ELF_SEGMENT_WRITE   2
-#define ELF_SEGMENT_READ    4
+#define ELF_SEGMENT_EXECUTE U(1)
+#define ELF_SEGMENT_WRITE   U(2)
+#define ELF_SEGMENT_READ    U(4)
 
 #endif /* SIMPLE_BOOT_LINKER_DEFS_H */

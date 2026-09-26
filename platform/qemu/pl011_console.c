@@ -2,21 +2,27 @@
  * Copyright (c) 2026 simple-boot contributors
  * SPDX-License-Identifier: MIT
  *
- * File: platform/qemu/virt/console.c
- * Brief: Validate and bind the QEMU virt console device.
+ * File: platform/qemu/pl011_console.c
+ * Brief: Validate and bind a QEMU PL011 console device.
  */
 
 /* Includes --------------------------------------------------------------- */
+#include "compiler_rt.h"
 #include "driver/pl011.h"
 #include "platform_def.h"
 
 /* Configuration checks --------------------------------------------------- */
-_Static_assert(PLATFORM_UART_BAUDRATE > 0 && PLATFORM_UART_CLOCK_HZ > 0,
-               "UART clock and baud rate must be nonzero");
-_Static_assert(PLATFORM_UART_CLOCK_HZ <=
-               (UINT32_MAX - PLATFORM_UART_BAUDRATE /
-                CONSOLE_BAUD_ROUNDING_DENOMINATOR) / PL011_BAUD_CLOCK_SCALE,
-               "PL011 baud divider arithmetic overflow");
+COMPILER_STATIC_ASSERT(
+    ((PLATFORM_UART_BAUDRATE > 0) && (PLATFORM_UART_CLOCK_HZ > 0)),
+    "UART clock and baud rate must be nonzero"
+);
+COMPILER_STATIC_ASSERT(
+    (PLATFORM_UART_CLOCK_HZ <=
+     ((UINT32_MAX - (PLATFORM_UART_BAUDRATE /
+                     CONSOLE_BAUD_ROUNDING_DENOMINATOR)) /
+      PL011_BAUD_CLOCK_SCALE)),
+    "PL011 baud divider arithmetic overflow"
+);
 
 /* Platform console binding ----------------------------------------------- */
 const struct console_device platform_console = {
