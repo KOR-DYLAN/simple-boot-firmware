@@ -158,9 +158,10 @@ whitespace is used.
 symbol detail panel.
 Arrow keys or
 `j`/`k` move, Space or Enter edits a value, `S` saves, and `Q` exits without
-saving. Saved changes are recorded in the selected image build directory's
-`kconfig.fragment`, relative to all input configs, and are applied last on
-subsequent configure runs.
+saving. `/` searches symbol names, prompts, types, and definition paths;
+`n` and `N` move to the next or previous matching symbol. Saved changes are
+recorded in the selected image build directory's `kconfig.fragment`, relative
+to all input configs, and are applied last on subsequent configure runs.
 
 `make defconfig` removes the local menu fragment and reconstructs `.config` from
 all selected input files. `make savedefconfig` writes each symbol that differs

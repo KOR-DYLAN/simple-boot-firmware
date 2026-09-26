@@ -107,6 +107,41 @@ def clamp_selectable(entries, selected):
     return selected
 
 
+def search_entries(entries, symbols, query):
+    """Return symbol entry indices matching a case-insensitive query."""
+    matches = []
+    needle = query.casefold()
+    for index, entry in enumerate(entries):
+        if entry[0] == "symbol":
+            symbol = symbols[entry[1]]
+            fields = (
+                "CONFIG_{}".format(symbol.name),
+                symbol.prompt,
+                symbol.kind,
+                str(symbol.path),
+            )
+            if any(needle in field.casefold() for field in fields):
+                matches.append(index)
+    return matches
+
+
+def search_match(matches, selected, step, include_selected=False):
+    """Find a matching entry in one direction and wrap at either end."""
+    result = selected
+    if matches:
+        if step > 0:
+            candidates = [index for index in matches
+                          if index > selected or
+                          (include_selected and index == selected)]
+            result = candidates[0] if candidates else matches[0]
+        else:
+            candidates = [index for index in matches
+                          if index < selected or
+                          (include_selected and index == selected)]
+            result = candidates[-1] if candidates else matches[-1]
+    return result
+
+
 def color_pair(pair):
     """Return a color pair only when the terminal supports colors."""
     if curses.has_colors():
@@ -131,18 +166,34 @@ def draw_bar(screen, row, text, attributes):
         draw_text(screen, row, 0, text.ljust(width), max(1, width - 1), attributes)
 
 
-def edit_value(screen, symbol, current, row):
-    """Read and validate a non-boolean value on the status line."""
+def read_input(screen, prompt):
+    """Read one status-line value while preserving normal cursor settings."""
     height, width = screen.getmaxyx()
-    prompt = "CONFIG_{}: ".format(symbol.name)
+    column = min(len(prompt), width - 1)
+    maximum = max(1, width - column - 1)
     screen.move(height - 2, 0)
     screen.clrtoeol()
     screen.addnstr(height - 2, 0, prompt, max(1, width - 1))
     curses.echo()
     try:
-        raw = screen.getstr(height - 2, min(len(prompt), width - 1)).decode("utf-8")
+        try:
+            curses.curs_set(1)
+        except curses.error:
+            pass
+        raw = screen.getstr(height - 2, column, maximum).decode("utf-8")
     finally:
         curses.noecho()
+        try:
+            curses.curs_set(0)
+        except curses.error:
+            pass
+    return raw
+
+
+def edit_value(screen, symbol, current, row):
+    """Read and validate a non-boolean value on the status line."""
+    prompt = "CONFIG_{}: ".format(symbol.name)
+    raw = read_input(screen, prompt)
     if symbol.kind == "string":
         raw = kconfig.quoted(raw)
     return kconfig.parse_value(symbol.kind, raw, symbol.path, row)
@@ -189,6 +240,8 @@ def menu(screen, source_dir, symbols, values):
     selected = selectable[0]
     offset = 0
     status = "Ready"
+    search_query = ""
+    search_matches = []
     try:
         curses.start_color()
         curses.use_default_colors()
@@ -265,7 +318,7 @@ def menu(screen, source_dir, symbols, values):
                  "  <Up/Down> Move  <Space/Enter> Edit  <S> Save  <Q> Quit",
                  color_pair(1) | curses.A_BOLD)
         draw_bar(screen, height - 1,
-                 "  <PgUp/PgDn> Page  <Home/End> Top/Bottom",
+                 "  </> Search  <n/N> Match  <PgUp/PgDn> Page",
                  color_pair(1))
         screen.refresh()
 
@@ -284,6 +337,34 @@ def menu(screen, source_dir, symbols, values):
             selected = selectable[0]
         elif key in (curses.KEY_END, ord("G")):
             selected = selectable[-1]
+        elif key == ord("/"):
+            query = read_input(screen, "Search: ").strip()
+            if query:
+                matches = search_entries(entries, symbols, query)
+                if matches:
+                    search_query = query
+                    search_matches = matches
+                    selected = search_match(matches, selected, 1, True)
+                    position = matches.index(selected) + 1
+                    status = "Search /{}: {}/{}".format(
+                        query, position, len(matches)
+                    )
+                else:
+                    search_query = query
+                    search_matches = []
+                    status = "No symbols match /{}".format(query)
+            else:
+                status = "Search cancelled"
+        elif key in (ord("n"), ord("N")):
+            if search_matches:
+                step = 1 if key == ord("n") else -1
+                selected = search_match(search_matches, selected, step)
+                position = search_matches.index(selected) + 1
+                status = "Search /{}: {}/{}".format(
+                    search_query, position, len(search_matches)
+                )
+            else:
+                status = "No active search; press /"
         elif key in (ord("q"), ord("Q")):
             return False
         elif key in (ord("s"), ord("S")):
