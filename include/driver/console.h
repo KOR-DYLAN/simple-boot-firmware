@@ -35,12 +35,36 @@ struct console_device {
 };
 
 /* Platform device -------------------------------------------------------- */
+/**
+ * @brief Immutable console device selected by the active platform.
+ */
 extern const struct console_device platform_console;
 
 /* Public API ------------------------------------------------------------- */
+/**
+ * @brief Initialize the configured platform console.
+ */
 void console_init(void);
+
+/**
+ * @brief Write one character to the platform console.
+ *
+ * @param character Character to write.
+ */
 void console_putc(char character);
+
+/**
+ * @brief Write a null-terminated string to the platform console.
+ *
+ * @param text String to write.
+ */
 void console_puts(const char *text);
+
+/**
+ * @brief Write a pointer-width hexadecimal value to the platform console.
+ *
+ * @param value Value to write.
+ */
 void console_hex(uintptr_t value);
 
 #endif /* SIMPLE_BOOT_CONSOLE_H */

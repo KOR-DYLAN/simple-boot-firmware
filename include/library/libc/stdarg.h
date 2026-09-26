@@ -11,9 +11,38 @@
 
 typedef __builtin_va_list va_list;
 
-#define va_start(arguments, last) __builtin_va_start(arguments, last)
-#define va_arg(arguments, type)   __builtin_va_arg(arguments, type)
+/* Variable argument operations ------------------------------------------ */
+/**
+ * @brief Initialize an argument list.
+ *
+ * @param arguments Argument list to initialize.
+ * @param last Last named parameter before the variable arguments.
+ */
+#define va_start(arguments, last)    __builtin_va_start(arguments, last)
+
+/**
+ * @brief Retrieve the next variable argument.
+ *
+ * @param arguments Initialized argument list.
+ * @param type Expected argument type.
+ *
+ * @return The next argument converted according to type.
+ */
+#define va_arg(arguments, type)      __builtin_va_arg(arguments, type)
+
+/**
+ * @brief Copy the current traversal state of an argument list.
+ *
+ * @param destination Argument list to initialize as a copy.
+ * @param source Initialized argument list to copy.
+ */
 #define va_copy(destination, source) __builtin_va_copy(destination, source)
-#define va_end(arguments)         __builtin_va_end(arguments)
+
+/**
+ * @brief Release resources associated with an argument list.
+ *
+ * @param arguments Initialized argument list to release.
+ */
+#define va_end(arguments)            __builtin_va_end(arguments)
 
 #endif /* SIMPLE_BOOT_STDARG_H */

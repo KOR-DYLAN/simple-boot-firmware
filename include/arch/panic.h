@@ -13,6 +13,11 @@
 #include <stdint.h>
 
 /* Panic diagnostics ------------------------------------------------------ */
+/**
+ * @brief Print architecture registers relevant to a fatal failure.
+ *
+ * @param program_counter Address associated with the panic call site.
+ */
 void arch_panic_dump(uintptr_t program_counter);
 
 #endif /* SIMPLE_BOOT_ARCH_PANIC_H */

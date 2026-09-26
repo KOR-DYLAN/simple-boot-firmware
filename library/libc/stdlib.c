@@ -30,6 +30,7 @@ static unsigned long divide_ulong(unsigned long dividend, unsigned int divisor)
         shifted_divisor <<= U(1);
         bit <<= U(1);
     }
+
     while (bit != UL(0)) {
         if (dividend >= shifted_divisor) {
             dividend -= shifted_divisor;
@@ -38,6 +39,7 @@ static unsigned long divide_ulong(unsigned long dividend, unsigned int divisor)
         shifted_divisor >>= U(1);
         bit >>= U(1);
     }
+
     return quotient;
 }
 
@@ -45,7 +47,7 @@ static unsigned int digit_value(int character)
 {
     unsigned int result = U(36);
 
-    if (character >= '0' && character <= '9') {
+    if ((character >= '0') && (character <= '9')) {
         result = (unsigned int)(character - '0');
     } else if ((character >= 'a') && (character <= 'z')) {
         result = (unsigned int)(character - 'a') + U(10);
@@ -54,6 +56,7 @@ static unsigned int digit_value(int character)
     } else {
         /* Keep the out-of-range sentinel. */
     }
+
     return result;
 }
 
@@ -68,18 +71,21 @@ static unsigned long parse_unsigned(const char *text, char **end, int base,
     while (isspace((unsigned char)*cursor)) {
         ++cursor;
     }
+
     *negative = (*cursor == '-');
     if ((*cursor == '+') || (*cursor == '-')) {
         ++cursor;
     }
+
     if (((base == 0) || (base == 16)) && (cursor[U(0)] == '0') &&
         ((cursor[U(1)] == 'x') || (cursor[U(1)] == 'X')) &&
         (digit_value((unsigned char)cursor[U(2)]) < U(16))) {
         cursor += U(2);
         base = 16;
     } else if (base == 0) {
-        base = cursor[0] == '0' ? 8 : 10;
+        base = (cursor[U(0)] == '0') ? 8 : 10;
     }
+
     digits = cursor;
     while (digit_value((unsigned char)*cursor) < (unsigned int)base) {
         digit = digit_value((unsigned char)*cursor);
@@ -92,9 +98,11 @@ static unsigned long parse_unsigned(const char *text, char **end, int base,
             value = (value * (unsigned int)base) + digit;
         }
     }
+
     if (end != NULL) {
-        *end = (char *)(cursor == digits ? text : cursor);
+        *end = (char *)((cursor == digits) ? text : cursor);
     }
+
     return value;
 }
 
@@ -123,6 +131,7 @@ unsigned long strtoul(const char *COMPILER_RESTRICT text,
             /* The parsed value is already the result. */
         }
     }
+
     return value;
 }
 
@@ -143,17 +152,19 @@ long strtol(const char *COMPILER_RESTRICT text,
         result = L(0);
     } else {
         value = parse_unsigned(text, end, base, &negative, &overflow);
-        limit = negative ? (unsigned long)LONG_MAX + UL(1)
+        limit = negative ? ((unsigned long)LONG_MAX + UL(1))
                          : (unsigned long)LONG_MAX;
         if (overflow || (value > limit)) {
             errno = ERANGE;
             result = negative ? LONG_MIN : LONG_MAX;
         } else if (negative) {
-            result = value == ((unsigned long)LONG_MAX + UL(1))
-                         ? LONG_MIN : -(long)value;
+            result = (value == ((unsigned long)LONG_MAX + UL(1)))
+                         ? LONG_MIN
+                         : -(long)value;
         } else {
             result = (long)value;
         }
     }
+
     return result;
 }

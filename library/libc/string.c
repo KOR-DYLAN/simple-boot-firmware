@@ -22,6 +22,7 @@ void *memcpy(void *COMPILER_RESTRICT destination,
     for (index = U(0); index < count; ++index) {
         dest[index] = src[index];
     }
+
     return destination;
 }
 
@@ -42,6 +43,7 @@ void *memmove(void *destination, const void *source, size_t count)
             dest[count] = src[count];
         }
     }
+
     return destination;
 }
 
@@ -53,6 +55,7 @@ void *memset(void *destination, int value, size_t count)
     for (index = U(0); index < count; ++index) {
         dest[index] = (unsigned char)value;
     }
+
     return destination;
 }
 
@@ -70,6 +73,7 @@ int memcmp(const void *left, const void *right, size_t count)
         }
         ++index;
     }
+
     return result;
 }
 
@@ -81,6 +85,7 @@ size_t strlen(const char *text)
     while (text[size] != '\0') {
         ++size;
     }
+
     return size;
 }
 
@@ -88,9 +93,10 @@ size_t strnlen(const char *text, size_t maximum)
 {
     size_t size = U(0);
 
-    while (size < maximum && text[size] != '\0') {
+    while ((size < maximum) && (text[size] != '\0')) {
         ++size;
     }
+
     return size;
 }
 
@@ -106,6 +112,7 @@ char *strcpy(char *COMPILER_RESTRICT destination,
         ++destination;
         ++source;
     }
+
     return result;
 }
 
@@ -119,9 +126,11 @@ char *strncpy(char *COMPILER_RESTRICT destination,
         destination[index] = source[index];
         ++index;
     }
+
     while (index < count) {
         destination[index++] = '\0';
     }
+
     return result;
 }
 
@@ -129,6 +138,7 @@ char *strcat(char *COMPILER_RESTRICT destination,
              const char *COMPILER_RESTRICT source)
 {
     strcpy(destination + strlen(destination), source);
+
     return destination;
 }
 
@@ -138,25 +148,30 @@ int strcmp(const char *left, const char *right)
         ++left;
         ++right;
     }
+
     return (int)(unsigned char)*left - (int)(unsigned char)*right;
 }
 
 int strncmp(const char *left, const char *right, size_t count)
 {
+    unsigned char a;
+    unsigned char b;
     int result = 0;
     size_t index = U(0);
     bool complete = false;
 
     while ((index < count) && (!complete)) {
-        unsigned char a = (unsigned char)left[index];
-        unsigned char b = (unsigned char)right[index];
+        a = (unsigned char)left[index];
+        b = (unsigned char)right[index];
 
         if ((a != b) || (a == '\0')) {
             result = (int)a - (int)b;
             complete = true;
         }
+
         ++index;
     }
+
     return result;
 }
 
@@ -176,6 +191,7 @@ char *strchr(const char *text, int character)
             ++text;
         }
     }
+
     return result;
 }
 
@@ -189,9 +205,11 @@ char *strrchr(const char *text, int character)
         if (*text == target) {
             result = text;
         }
+
         /* Include the terminator in the search, as required for '\0'. */
         complete = (*text == '\0');
         ++text;
     }
+
     return (char *)result;
 }

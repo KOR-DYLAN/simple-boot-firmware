@@ -456,6 +456,12 @@ The linker requires positive region sizes, 16-byte boundary alignment,
 Bootloader2 requires `CODE_START == BOOTLOADER2_ENTRY_ADDRESS`. Architecture
 vector alignment and platform address limits are also validated.
 
+Set `CONFIG_BOOT_MERGE_TEXT_RODATA=y` to combine `.text` and `.rodata` into one
+RX load region spanning `CODE_START..RO_DATA_END`. The `.data` load image follows
+the packed read-only contents, and all three share the combined address
+capacity. When disabled, code and read-only data retain separate RX and R load
+regions.
+
 ## Implementation structure
 
 | Location | Responsibility |

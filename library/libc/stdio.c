@@ -67,6 +67,7 @@ static uintmax_t divide_uintmax(uintmax_t dividend, unsigned int divisor,
         shifted_divisor <<= U(1);
         bit <<= U(1);
     }
+
     while (bit != ULL(0)) {
         if (dividend >= shifted_divisor) {
             dividend -= shifted_divisor;
@@ -75,7 +76,9 @@ static uintmax_t divide_uintmax(uintmax_t dividend, unsigned int divisor,
         shifted_divisor >>= U(1);
         bit >>= U(1);
     }
+
     *remainder = (unsigned int)dividend;
+
     return quotient;
 }
 
@@ -94,6 +97,7 @@ static void output_character(struct output *output, char character)
 /* Platforms override this weak sink when console output is available. */
 COMPILER_WEAK int putchar(int character)
 {
+
     return (unsigned char)character;
 }
 
@@ -102,7 +106,9 @@ int puts(const char *text)
     while (*text != '\0') {
         putchar((unsigned char)*text++);
     }
+
     putchar('\n');
+
     return 0;
 }
 
@@ -143,6 +149,7 @@ static uintmax_t read_unsigned(va_list *arguments, enum format_length length)
         result = va_arg(*arguments, unsigned int);
         break;
     }
+
     return result;
 }
 
@@ -174,6 +181,7 @@ static intmax_t read_signed(va_list *arguments, enum format_length length)
         result = va_arg(*arguments, int);
         break;
     }
+
     return result;
 }
 
@@ -182,13 +190,15 @@ static void format_integer(struct output *output, uintmax_t value, unsigned int 
                            char sign, int width, int precision)
 {
     char reversed[sizeof(value) * CHAR_BIT];
-    const char *digits = uppercase ? "0123456789ABCDEF" : "0123456789abcdef";
+    const char *digits;
     const char *prefix = "";
     size_t prefix_size = U(0);
     size_t digit_count = U(0);
     size_t zero_count;
     size_t total;
     unsigned int remainder;
+
+    digits = uppercase ? "0123456789ABCDEF" : "0123456789abcdef";
 
     if (value == ULL(0)) {
         if (precision != 0) {
@@ -200,37 +210,46 @@ static void format_integer(struct output *output, uintmax_t value, unsigned int 
             reversed[digit_count++] = digits[remainder];
         }
     }
-    if (alternate && (base == FORMAT_BASE_HEXADECIMAL) &&
+
+    if ((alternate) && (base == FORMAT_BASE_HEXADECIMAL) &&
         (digit_count != U(0))) {
         prefix = uppercase ? "0X" : "0x";
         prefix_size = U(2);
-    } else if (alternate && (base == FORMAT_BASE_OCTAL) &&
+    } else if ((alternate) && (base == FORMAT_BASE_OCTAL) &&
                ((digit_count == U(0)) ||
                 (reversed[digit_count - U(1)] != '0'))) {
         prefix = "0";
         prefix_size = U(1);
     }
-    zero_count = precision > (int)digit_count
-                     ? (size_t)precision - digit_count : U(0);
-    total = digit_count + zero_count + prefix_size + (sign != '\0');
-    if (zero && (!left) && (precision < 0) && (width > (int)total)) {
+
+    zero_count = (precision > (int)digit_count)
+                     ? ((size_t)precision - digit_count)
+                     : U(0);
+    total = digit_count + zero_count + prefix_size + (size_t)(sign != '\0');
+    if ((zero) && (!left) && (precision < 0) && (width > (int)total)) {
         zero_count += (size_t)width - total;
         total = (size_t)width;
     }
+
     if ((!left) && (width > (int)total)) {
         output_repeat(output, ' ', (size_t)width - total);
     }
+
     if (sign != '\0') {
         output_character(output, sign);
     }
+
     while (prefix_size-- != 0) {
         output_character(output, *prefix++);
     }
+
     output_repeat(output, '0', zero_count);
+
     while (digit_count-- != 0) {
         output_character(output, reversed[digit_count]);
     }
-    if (left && (width > (int)total)) {
+
+    if ((left) && (width > (int)total)) {
         output_repeat(output, ' ', (size_t)width - total);
     }
 }
@@ -242,8 +261,10 @@ static const char *parse_number(const char *format, int *value)
         if (*value <= (INT_MAX - (*format - '0')) / 10) {
             *value = *value * 10 + (*format - '0');
         }
+
         ++format;
     }
+
     return format;
 }
 
@@ -269,6 +290,7 @@ static const char *parse_flags(const char *format, struct format_spec *spec)
             ++format;
         }
     }
+
     return format;
 }
 
@@ -285,6 +307,7 @@ static const char *parse_width(const char *format, struct format_spec *spec,
     } else {
         format = parse_number(format, &spec->width);
     }
+
     return format;
 }
 
@@ -304,6 +327,7 @@ static const char *parse_precision(const char *format, struct format_spec *spec,
             format = parse_number(format, &spec->precision);
         }
     }
+
     return format;
 }
 
@@ -335,17 +359,31 @@ static const char *parse_length(const char *format, struct format_spec *spec)
     } else {
         /* Keep the default length. */
     }
+
     return format;
 }
 
 static void format_signed_value(struct output *output, const struct format_spec *spec,
                                 va_list *arguments)
 {
-    intmax_t signed_value = read_signed(arguments, spec->length);
-    bool negative = signed_value < 0;
-    uintmax_t value = negative ? (uintmax_t)0 - (uintmax_t)signed_value
-                               : (uintmax_t)signed_value;
-    char sign = negative ? '-' : (spec->plus ? '+' : (spec->space ? ' ' : '\0'));
+    intmax_t signed_value;
+    bool negative;
+    uintmax_t value;
+    char sign = '\0';
+
+    signed_value = read_signed(arguments, spec->length);
+    negative = (signed_value < 0);
+    value = negative ? (ULL(0) - (uintmax_t)signed_value)
+                     : (uintmax_t)signed_value;
+    if (negative) {
+        sign = '-';
+    } else if (spec->plus) {
+        sign = '+';
+    } else if (spec->space) {
+        sign = ' ';
+    } else {
+        /* No sign prefix is required. */
+    }
 
     format_integer(output, value, FORMAT_BASE_DECIMAL, false, spec->left,
                    spec->zero, false, sign, spec->width, spec->precision);
@@ -363,8 +401,9 @@ static void format_unsigned_value(struct output *output, const struct format_spe
     } else {
         /* Hexadecimal is the default for this helper. */
     }
+
     format_integer(output, read_unsigned(arguments, spec->length), base,
-                   conversion == 'X', spec->left, spec->zero, spec->alternate,
+                   (conversion == 'X'), spec->left, spec->zero, spec->alternate,
                    '\0', spec->width, spec->precision);
 }
 
@@ -374,8 +413,10 @@ static void format_character(struct output *output, const struct format_spec *sp
     if ((!spec->left) && (spec->width > 1)) {
         output_repeat(output, ' ', (size_t)spec->width - U(1));
     }
+
     output_character(output, (char)va_arg(*arguments, int));
-    if (spec->left && (spec->width > 1)) {
+
+    if ((spec->left) && (spec->width > 1)) {
         output_repeat(output, ' ', (size_t)spec->width - U(1));
     }
 }
@@ -390,15 +431,19 @@ static void format_string(struct output *output, const struct format_spec *spec,
     if (text == NULL) {
         text = "(null)";
     }
-    size = spec->precision < 0 ? strlen(text)
-                               : strnlen(text, (size_t)spec->precision);
+
+    size = (spec->precision < 0)
+               ? strlen(text)
+               : strnlen(text, (size_t)spec->precision);
     if ((!spec->left) && (spec->width > (int)size)) {
         output_repeat(output, ' ', (size_t)spec->width - size);
     }
+
     for (index = U(0); index < size; ++index) {
         output_character(output, text[index]);
     }
-    if (spec->left && (spec->width > (int)size)) {
+
+    if ((spec->left) && (spec->width > (int)size)) {
         output_repeat(output, ' ', (size_t)spec->width - size);
     }
 }
@@ -421,7 +466,7 @@ static void format_conversion(struct output *output, const struct format_spec *s
         format_integer(output, (uintptr_t)va_arg(*arguments, void *),
                        FORMAT_BASE_HEXADECIMAL, false, spec->left, spec->zero,
                        true, '\0', spec->width,
-                       spec->precision < 0 ? 1 : spec->precision);
+                       (spec->precision < 0) ? 1 : spec->precision);
         break;
     case 'c':
         format_character(output, spec, arguments);
@@ -451,6 +496,7 @@ static const char *parse_spec(const char *format, struct format_spec *spec,
     format = parse_width(format, spec, arguments);
     format = parse_precision(format, spec, arguments);
     format = parse_length(format, spec);
+
     return format;
 }
 
@@ -473,13 +519,17 @@ static int format_output(struct output *output, const char *format, va_list argu
             ++format;
         }
     }
+
     va_end(args);
+
     if ((!output->console) && (output->capacity != U(0))) {
-        end = output->count < output->capacity
-                  ? output->count : output->capacity - U(1);
+        end = (output->count < output->capacity)
+                  ? output->count
+                  : (output->capacity - U(1));
         output->buffer[end] = '\0';
     }
-    return output->count > INT_MAX ? -1 : (int)output->count;
+
+    return (output->count > INT_MAX) ? -1 : (int)output->count;
 }
 
 /* Public API ------------------------------------------------------------- */
@@ -500,12 +550,14 @@ int snprintf(char *COMPILER_RESTRICT buffer, size_t size,
     va_start(arguments, format);
     result = vsnprintf(buffer, size, format, arguments);
     va_end(arguments);
+
     return result;
 }
 
 int vsprintf(char *COMPILER_RESTRICT buffer,
              const char *COMPILER_RESTRICT format, va_list arguments)
 {
+
     return vsnprintf(buffer, SIZE_MAX, format, arguments);
 }
 
@@ -518,6 +570,7 @@ int sprintf(char *COMPILER_RESTRICT buffer,
     va_start(arguments, format);
     result = vsprintf(buffer, format, arguments);
     va_end(arguments);
+
     return result;
 }
 
@@ -536,5 +589,6 @@ int printf(const char *COMPILER_RESTRICT format, ...)
     va_start(arguments, format);
     result = vprintf(format, arguments);
     va_end(arguments);
+
     return result;
 }

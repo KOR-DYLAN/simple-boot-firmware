@@ -33,6 +33,7 @@ void console_puts(const char *text)
         if (*text == '\n') {
             console_putc('\r');
         }
+
         console_putc(*text++);
     }
 }
@@ -54,6 +55,8 @@ int putchar(int character)
     if (character == '\n') {
         console_putc('\r');
     }
+
     console_putc((char)character);
+
     return (unsigned char)character;
 }

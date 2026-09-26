@@ -24,6 +24,7 @@
 static volatile uint32_t *cmsdk_reg(const struct console_device *device,
                                    uintptr_t offset)
 {
+
     return (volatile uint32_t *)(device->base + offset);
 }
 
@@ -46,6 +47,7 @@ static void cmsdk_putc(const struct console_device *device, char character)
     while ((*cmsdk_reg(device, CMSDK_STATE) & CMSDK_TX_FULL) != U(0)) {
         /* Wait for room in the transmit buffer. */
     }
+
     *cmsdk_reg(device, CMSDK_DATA) = (uint32_t)(unsigned char)character;
 }
 

@@ -13,6 +13,9 @@
 #include "driver/console.h"
 
 /* Driver operations ------------------------------------------------------ */
+/**
+ * @brief Polling console operations implemented by the CMSDK APB UART.
+ */
 extern const struct console_ops cmsdk_apb_uart_console_ops;
 
 #endif /* SIMPLE_BOOT_CMSDK_UART_H */

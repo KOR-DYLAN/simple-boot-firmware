@@ -13,6 +13,11 @@
 #include "panic.h"
 
 /* Assertion macros ------------------------------------------------------- */
+/**
+ * @brief Panic when a required runtime condition is false.
+ *
+ * @param condition Runtime condition that must evaluate as true.
+ */
 #define assert(condition)                                                    \
     do {                                                                     \
         if (!(condition)) {                                                  \
@@ -20,6 +25,12 @@
         }                                                                    \
     } while (0)
 
+/**
+ * @brief Panic with a descriptive message when a condition is false.
+ *
+ * @param condition Runtime condition that must evaluate as true.
+ * @param message Null-terminated diagnostic message.
+ */
 #define assert_msg(condition, message)                                       \
     do {                                                                     \
         if (!(condition)) {                                                  \

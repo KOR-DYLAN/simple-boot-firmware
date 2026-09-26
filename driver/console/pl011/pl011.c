@@ -63,6 +63,7 @@ static void pl011_putc(const struct console_device *device, char character)
     while ((*pl011_reg(device, PL011_FR) & PL011_TX_FULL) != U(0)) {
         /* Wait for room in the transmit buffer. */
     }
+
     *pl011_reg(device, PL011_DR) = (uint32_t)(unsigned char)character;
 }
 

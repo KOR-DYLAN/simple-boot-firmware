@@ -28,6 +28,7 @@ panic_report(const char *expression, const char *message, bool has_message,
     if (has_message) {
         printf("message: %s\n", message);
     }
+
     printf("condition: %s\n", expression);
     printf("location: %s:%u (%s)\n", file, (unsigned int)line, function);
     console_puts("registers:\n");

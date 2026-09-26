@@ -29,6 +29,7 @@ static uint32_t read_register(uintptr_t address)
 
     reg = (const volatile uint32_t *)address;
     value = *reg;
+
     return value;
 }
 

@@ -21,6 +21,9 @@
 #define PL011_BAUD_CLOCK_SCALE    (PL011_BAUD_FRACTION_SCALE / PL011_BAUD_OVERSAMPLE)
 
 /* Driver operations ------------------------------------------------------ */
+/**
+ * @brief Polling console operations implemented by the PL011 driver.
+ */
 extern const struct console_ops pl011_console_ops;
 
 #endif /* SIMPLE_BOOT_PL011_H */

@@ -21,6 +21,9 @@
 #define BOOT_STATUS_FAILED       U(0xbad)
 
 /* Debugger-visible runtime state ----------------------------------------- */
+/**
+ * @brief Current boot result exposed to debuggers and validation code.
+ */
 extern volatile uint32_t boot_status;
 
 #endif /* SIMPLE_BOOT_STATUS_H */
