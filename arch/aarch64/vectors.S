@@ -18,10 +18,17 @@
 func default_exception_handler
     unwind_root
     /*
-     * Wait without using the stack. Inspect CurrentEL, ESR_ELx, ELR_ELx, FAR_ELx, and
-     * SPSR_ELx in GDB.
+     * Mask all asynchronous exceptions to prevent nested entry, then wait
+     * without touching a possibly invalid stack. Inspect CurrentEL, ESR_ELx,
+     * ELR_ELx, FAR_ELx, and SPSR_ELx in GDB to identify the original fault.
      */
     msr     daifset, #A64_DAIF_ALL
+    /*
+     * Pseudocode:
+     * for (;;) {
+     *     wait_for_interrupt();
+     * }
+     */
 .Lexception:
     wfi
     b       .Lexception

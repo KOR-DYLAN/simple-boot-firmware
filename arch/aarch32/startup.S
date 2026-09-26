@@ -22,9 +22,14 @@
 /* Reset entry ------------------------------------------------------------ */
 func _start, section=.text.boot
     unwind_root
+    /* Mask asynchronous abort, IRQ, and FIQ until vector bases are valid. */
     cpsid   aif
 #if defined(BOOT_AARCH32_SECURE_ENTRY)
-    /* Secure reset can enter in SVC; select the security monitor explicitly. */
+    /*
+     * Secure reset may enter in SVC mode. Switch to Monitor mode, clear SCR.NS
+     * to retain Secure state, and install MVBAR before any exception can enter
+     * the monitor vector bank.
+     */
     cps     #ARM_CPSR_MODE_MON
     ldcopr  r0, ARM_SCR
     bic     r0, r0, #ARM_SCR_NS
@@ -33,19 +38,29 @@ func _start, section=.text.boot
     stcopr  r0, ARM_MVBAR
     b       .Lprivileged_entry
 #else
+    /* Determine whether reset entered the virtualization HYP mode. */
     mrs     r0, cpsr
     and     r0, r0, #ARM_CPSR_MODE_MASK
     cmp     r0, #ARM_CPSR_MODE_HYP
     bne     .Lenter_svc
 
-    /* Leave HYP through an exception return. */
+    /*
+     * Install HVBAR before changing HYP controls. HCR and HSTR are cleared to
+     * disable stage-2 translation and system-register traps. HCPTR retains its
+     * required RES1 pattern while leaving coprocessor traps disabled.
+     */
     load_addr r0, aarch32_vectors
     stcopr  r0, ARM_HVBAR
     mov     r0, #ARM_HYP_TRAPS_DISABLED
-    stcopr  r0, ARM_HCR            /* Disable stage 2 translation and traps. */
+    stcopr  r0, ARM_HCR
     stcopr  r0, ARM_HSTR
-    mov_imm r0, ARM_HCPTR_RES1     /* Preserve RES1 fields. */
-    stcopr  r0, ARM_HCPTR          /* Disable coprocessor traps. */
+    mov_imm r0, ARM_HCPTR_RES1
+    stcopr  r0, ARM_HCPTR
+
+    /*
+     * Return from HYP into the local SVC label. SPSR selects SVC mode, masks
+     * asynchronous exceptions, and leaves execution in little-endian ARM state.
+     */
     load_addr r0, .Lsvc_entry
     msr     elr_hyp, r0
     mov_imm r0, ARM_SVC_RESET_PSR  /* Masked interrupts, little-endian ARM state. */
@@ -54,14 +69,16 @@ func _start, section=.text.boot
     eret
 
 .Lenter_svc:
+    /* Normalize a privileged non-HYP reset entry to the SVC mode used below. */
     cps     #ARM_CPSR_MODE_SVC
 .Lsvc_entry:
 #endif
 .Lprivileged_entry:
     setend  le
     /*
-     * Preserve RES1 bits; disable the MMU, alignment checks, and caches. Select VBAR
-     * instead of high vectors.
+     * Preserve unrelated and RES1 SCTLR bits. Clear M, A, C, and I to disable
+     * translation, alignment checks, and both caches. Clear V to select VBAR
+     * rather than the fixed high-vector address, and clear EE for little endian.
      */
     ldcopr  r0, ARM_SCTLR
     bic     r0, r0, #(ARM_SCTLR_M | ARM_SCTLR_A | ARM_SCTLR_C)
@@ -69,10 +86,13 @@ func _start, section=.text.boot
     bic     r0, r0, #ARM_SCTLR_V
     bic     r0, r0, #ARM_SCTLR_EE
     stcopr  r0, ARM_SCTLR
+
+    /* Install the SVC vector table and synchronize the new control context. */
     load_addr r0, aarch32_vectors
     stcopr  r0, ARM_VBAR
     isb
 
+    /* Initialize memory without SP, then install the newly cleared stack. */
     bl      runtime_init
     load_addr r0, __stack_top
     mov     sp, r0
@@ -84,7 +104,14 @@ endfunc _start
 /* Halt entry ------------------------------------------------------------- */
 func boot_halt
     unwind_root
+    /* Mask all asynchronous exceptions so WFI cannot resume normal boot flow. */
     cpsid   aif
+    /*
+     * Pseudocode:
+     * for (;;) {
+     *     wait_for_interrupt();
+     * }
+     */
 .Lhalt:
     wfi
     b       .Lhalt
@@ -93,8 +120,17 @@ endfunc boot_halt
 /* Default exception handler ---------------------------------------------- */
 func default_exception_handler
     unwind_root
-    /* Inspect CPSR, SPSR, banked LR or ELR_hyp, and DFSR/IFSR/DFAR/IFAR in GDB. */
+    /*
+     * Mask nested exceptions and preserve all fault state for GDB. Inspect
+     * CPSR, SPSR, banked LR or ELR_hyp, and DFSR/IFSR/DFAR/IFAR.
+     */
     cpsid   aif
+    /*
+     * Pseudocode:
+     * for (;;) {
+     *     wait_for_interrupt();
+     * }
+     */
 .Lexception:
     wfi
     b       .Lexception

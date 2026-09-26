@@ -42,6 +42,12 @@ vector_table:
     .word CORTEX_M_RESERVED_VECTOR
     vector_handler PendSV_Handler
     vector_handler SysTick_Handler
+    /*
+     * Assembly-time pseudocode:
+     * for each platform IRQ number {
+     *     emit vector entry and weak default-handler alias;
+     * }
+     */
     .irp irq, PLATFORM_IRQ_NUMBERS
     vector_handler IRQ\irq\()_Handler
     .endr
@@ -53,19 +59,32 @@ vector_table:
 /* Reset entry ------------------------------------------------------------ */
 func Reset_Handler, section=.text.boot
     unwind_root
+    /* Keep configurable interrupts masked until runtime state is initialized. */
     cpsid   i
+
+    /*
+     * CONTROL=0 selects privileged Thread mode and MSP. The ISB makes the stack
+     * selection effective before any subsequent instruction can use SP.
+     */
     movs    r0, #CORTEX_M_CONTROL_PRIVILEGED_MSP
     msr     control, r0
     isb
 
-    /* Point SCB VTOR to the vector table placed by the linker. */
+    /*
+     * Point SCB.VTOR at the linker-placed vector table. DSB completes the
+     * memory-mapped register write and ISB refreshes exception-vector context
+     * before runtime initialization can fault.
+     */
     mov_imm r0, CORTEX_M_SCB_VTOR
     load_addr r1, vector_table
     str     r1, [r0]
     dsb
     isb
 
-    /* No live stack frames exist while the assembly runtime clears the stack. */
+    /*
+     * No live stack frames exist while runtime_init relocates .data and clears
+     * .bss and stack memory. Reload MSP afterward from the first vector value.
+     */
     bl      runtime_init
     load_addr r0, __stack_top
     msr     msp, r0
@@ -78,8 +97,12 @@ func_alias _start, Reset_Handler
 /* Default exception handler ---------------------------------------------- */
 func default_exception_handler
     unwind_root
-    /* Preserve the stacked exception frame and IPSR for GDB. */
+    /* Preserve the hardware-stacked frame and IPSR for debugger inspection. */
     cpsid   i
+    /*
+     * Pseudocode:
+     * for (;;) { }
+     */
 .Lexception_wait:
     b       .Lexception_wait
 endfunc default_exception_handler
@@ -87,7 +110,14 @@ endfunc default_exception_handler
 /* Halt entry ------------------------------------------------------------- */
 func boot_halt
     unwind_root
+    /* Prevent normal interrupts from waking halted firmware into unknown code. */
     cpsid   i
+    /*
+     * Pseudocode:
+     * for (;;) {
+     *     wait_for_interrupt();
+     * }
+     */
 .Lhalt_wait:
     wfi
     b       .Lhalt_wait

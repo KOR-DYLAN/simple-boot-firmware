@@ -22,6 +22,12 @@
  */
 .macro mov_imm reg:req, val:req
     .set .Lmov_width\@, ASM_DWORD_BITS
+    /*
+     * Assembly-time pseudocode:
+     * for each register suffix {
+     *     if (reg is the corresponding W register) width = 32;
+     * }
+     */
     .irp index, A64_W_REGISTER_SUFFIXES
         .ifc \reg,w\index
             .set .Lmov_width\@, ASM_WORD_BITS
@@ -36,6 +42,12 @@
         .endif
     .endif
     .set .Lmov_started\@, 0
+    /*
+     * Assembly-time pseudocode:
+     * for (shift = 0; shift < width; shift += 16) {
+     *     if (((value >> shift) & 0xffff) != 0) emit MOVZ first, then MOVK;
+     * }
+     */
     .irp shift, ASM_IMMEDIATE_SHIFTS
         .if \shift < .Lmov_width\@
             .if ((\val) >> \shift) & ASM_HALFWORD_MASK

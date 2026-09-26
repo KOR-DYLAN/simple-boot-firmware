@@ -14,13 +14,18 @@
 
 /* Image handoff ---------------------------------------------------------- */
 func boot_jump
+    /* Preserve entry in x5 while shifting four payload arguments into x0-x3. */
     mov     x5, x0
     mov     x0, x1
     mov     x1, x2
     mov     x2, x3
     mov     x3, x4
+
+    /* Complete prior memory accesses and context changes before new code runs. */
     dsb     sy
     isb
+
+    /* Branch without a link so the destination cannot return to this image. */
     br      x5
 endfunc boot_jump
 

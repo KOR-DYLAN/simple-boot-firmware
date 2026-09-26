@@ -6,24 +6,59 @@
 
 .DEFAULT_GOAL := build
 
+# Absolute repository root used for source and default output paths.
 SOURCE_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+
+# Target architecture passed to CMake as BOOT_ARCH.
 ARCH ?= aarch64
+
+# Optional platform override in vendor/board form; empty selects the arch default.
 PLATFORM ?=
+
+# Optional base configuration name or path applied to every named configuration.
 CONFIG ?=
+
+# Independent configuration names built by the aggregate configure and build targets.
 CONFIGS ?= bl1 bl2
+
+# Configuration operated on by menuconfig, defconfig, showconfig, and target.
 BUILD_CONFIG ?= $(firstword $(CONFIGS))
+
+# Ordered pair combined into firmware.bin and used by run and debug targets.
 FIRMWARE_CONFIGS ?= bl1 bl2
+
+# Common configuration fragments merged into every named configuration.
 FRAGMENTS ?=
+
+# Root output directory; BUILD_DIR_<name> may override one configuration path.
 BUILD_DIR ?= $(SOURCE_DIR)/build/$(ARCH)
+
+# Canonical output root shared with CMake for cross-configuration discovery.
 MULTIBUILD_ROOT := $(abspath $(BUILD_DIR))
+
+# CMake build type applied to every named configuration.
 BUILD_TYPE ?= Debug
+
+# CMake backend generator used when creating each build directory.
 GENERATOR ?= Ninja
+
+# CMake executable or wrapper used for configuration and build commands.
 CMAKE ?= cmake
+
+# Python interpreter used by image composition and cleanup scripts.
 PYTHON ?= python3
+
+# Extra CMake configure options; CMAKE_ARGS_<name> adds per-config options.
 CMAKE_ARGS ?=
+
+# Extra options appended to CMake build invocations.
 BUILD_ARGS ?=
+
+# CMake target built by the Makefile target rule for BUILD_CONFIG.
 TARGET ?= boot
-JOBS ?=
+
+# Optional parallel job count passed to CMake builds; empty uses backend defaults.
+JOBS ?= $(nproc)
 
 EMPTY :=
 SPACE := $(EMPTY) $(EMPTY)
