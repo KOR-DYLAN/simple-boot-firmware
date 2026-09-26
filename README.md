@@ -132,10 +132,11 @@ The command above merges both files into `BUILD_DIR/.config`. Commas, semicolons
 and whitespace can separate file names when invoking CMake directly; quoting is
 recommended when whitespace is used.
 
-`make menuconfig` starts from the merged `.config`. Arrow keys or `j`/`k` move,
-Space or Enter edits a value, `S` saves, and `Q` exits without saving. Saved
-changes are recorded in `BUILD_DIR/kconfig.fragment` relative to the selected
-board configs and are applied last on subsequent configure runs.
+`make menuconfig` starts from the merged `.config` and opens an nconfig-style
+terminal UI with a configuration list and symbol detail panel. Arrow keys or
+`j`/`k` move, Space or Enter edits a value, `S` saves, and `Q` exits without
+saving. Saved changes are recorded in `BUILD_DIR/kconfig.fragment` relative to
+the selected board configs and are applied last on subsequent configure runs.
 
 `make defconfig` removes the local menu fragment and reconstructs `.config` from
 the files named by `CONFIG`. `make savedefconfig` writes symbols that differ from
@@ -430,9 +431,7 @@ vector alignment and platform address limits are also validated.
 | Location | Responsibility |
 | --- | --- |
 | `arch/` | Architecture startup, core exception handling, and assembly rules |
-| `boot/` | Shared stage validation, linker script, image link, and artifacts |
-| `boot/bl1/` | Bootloader1 entry and bootloader2 handoff |
-| `boot/bl2/` | Bootloader2 entry and payload handoff |
+| `boot/` | Shared stage entry, validation, linker script, image link, and artifacts |
 | `include/arch/` | Architectural register fields, ABI, and core vector constants |
 | `include/asm/` | Function, constant-load, address, and vector helper macros |
 | `include/library/libc/` | Project-owned size, integer, memory, and string declarations |
@@ -483,10 +482,14 @@ and external IRQ configuration belong in `platform_def.h`; region boundaries
 and allowed ranges belong in `platform_memory.h`. See the
 [Platform contract](platform/README.md#platform-contract) for included examples.
 
-Shared runtime validation is implemented in [common.c](boot/common.c).
-[bootloader1](boot/bl1/main.c) and [bootloader2](boot/bl2/main.c) own their stage
-entry and handoff policy. Architecture-specific `boot_jump()` implementations
-perform the final register and vector-table handoff. Interrupt support
+Shared runtime validation is implemented in [common.c](boot/common.c). The common
+[boot entry](boot/main.c) selects the stage behavior from `BOOT_STAGE` and calls
+weak platform hooks declared in [platform.h](include/platform.h):
+`platform_early_init()`, `platform_arch_init()`, and `platform_init()`. A platform
+can override those hooks with normal strong definitions and can add stage-specific
+sources from `platform.cmake` with `BOOT_PLATFORM_STAGE1_SOURCES` or
+`BOOT_PLATFORM_STAGE2_SOURCES`. Architecture-specific `boot_jump()`
+implementations perform the final register and vector-table handoff. Interrupt support
 requires controller/peripheral initialization, unmasking, and appropriate context
 save/restore. Default handlers provide fault inspection rather than a scheduler.
 ### Assembly macros

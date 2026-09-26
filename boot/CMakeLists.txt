@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 #
 # File: boot/CMakeLists.txt
-# Brief: Build both bootloader stages and generate their artifacts.
+# Brief: Build boot stages and generate their artifacts.
 
 # Linker preprocessing inputs ------------------------------------------------
 # Preprocess each linker script with its stage and the shared build settings.
@@ -22,6 +22,22 @@ function(add_boot_stage stage image_name)
     set(boot_target "${image_name}_image")
     set(boot_linker_script "${PROJECT_BINARY_DIR}/${image_name}.ld")
     set(boot_map "${PROJECT_BINARY_DIR}/${image_name}.map")
+    set(boot_stage_sources
+        "${BOOT_SOURCE_DIR}/main.c"
+        "${BOOT_SOURCE_DIR}/platform.c"
+        ${BOOT_PLATFORM_SOURCES}
+    )
+    if(stage EQUAL BOOT_STAGE_1)
+        list(APPEND boot_stage_sources
+            ${BOOT_PLATFORM_STAGE1_SOURCES}
+            ${BOOT_PLATFORM_BL1_SOURCES}
+        )
+    else()
+        list(APPEND boot_stage_sources
+            ${BOOT_PLATFORM_STAGE2_SOURCES}
+            ${BOOT_PLATFORM_BL2_SOURCES}
+        )
+    endif()
 
     add_custom_command(
         OUTPUT "${boot_linker_script}"
@@ -43,7 +59,11 @@ function(add_boot_stage stage image_name)
     )
     add_custom_target("${image_name}_linker_script" DEPENDS "${boot_linker_script}")
 
-    add_executable("${boot_target}" "${BOOT_COMMON_SOURCE}" ${ARGN})
+    add_executable("${boot_target}"
+        "${BOOT_COMMON_SOURCE}"
+        ${boot_stage_sources}
+        ${ARGN}
+    )
     set_target_properties("${boot_target}" PROPERTIES
         OUTPUT_NAME "${image_name}"
         RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}"
@@ -101,8 +121,12 @@ set(BOOT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(BOOT_COMMON_SOURCE "${BOOT_SOURCE_DIR}/common.c")
 set(BOOT_STAGE_1 1)
 set(BOOT_STAGE_2 2)
-add_subdirectory_if_enabled(CONFIG_BOOTLOADER1 bl1)
-add_subdirectory_if_enabled(CONFIG_BOOTLOADER2 bl2)
+if(CONFIG_BOOTLOADER1)
+    add_boot_stage(${BOOT_STAGE_1} bootloader1)
+endif()
+if(CONFIG_BOOTLOADER2)
+    add_boot_stage(${BOOT_STAGE_2} bootloader2)
+endif()
 
 # Combined image and aggregate target ----------------------------------------
 set(BOOT_FIRMWARE_BIN "${PROJECT_BINARY_DIR}/firmware.bin")

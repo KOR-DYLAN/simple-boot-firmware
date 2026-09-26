@@ -8,5 +8,41 @@ config BOOT
     bool "Boot image"
     default y
 
-source "boot/bl1/KConfig"
-source "boot/bl2/KConfig"
+config BOOTLOADER1
+    bool "Bootloader1 image"
+    depends on BOOT
+    default y
+
+config BOOTLOADER2
+    bool "Bootloader2 image"
+    depends on BOOT
+    default y
+
+config BOOTLOADER2_AUTO_BOOT
+    bool "Jump from bootloader2 to the payload"
+    depends on BOOTLOADER2
+    default n
+
+config PAYLOAD_LOAD_ADDRESS
+    hex "Payload load address"
+    default 0x0
+
+config PAYLOAD_ENTRY_ADDRESS
+    hex "Payload entry address"
+    default 0x0
+
+config PAYLOAD_ARGUMENT_0
+    hex "Payload argument register 0"
+    default 0x0
+
+config PAYLOAD_ARGUMENT_1
+    hex "Payload argument register 1"
+    default 0x0
+
+config PAYLOAD_ARGUMENT_2
+    hex "Payload argument register 2"
+    default 0x0
+
+config PAYLOAD_ARGUMENT_3
+    hex "Payload argument register 3"
+    default 0x0

@@ -40,6 +40,86 @@ def render_value(symbol, value):
     return str(value)
 
 
+def symbol_group(source_dir, symbol):
+    try:
+        relative = symbol.path.relative_to(source_dir)
+    except ValueError:
+        relative = symbol.path
+    parent = relative.parent
+    if str(parent) == ".":
+        return "General"
+    return str(parent)
+
+
+def symbol_location(source_dir, symbol):
+    try:
+        return symbol.path.relative_to(source_dir)
+    except ValueError:
+        return symbol.path
+
+
+def build_entries(source_dir, symbols):
+    entries = []
+    last_group = None
+    ordered_symbols = sorted(
+        symbols.values(), key=lambda symbol: (str(symbol.path), symbol.line)
+    )
+    for symbol in ordered_symbols:
+        name = symbol.name
+        group = symbol_group(source_dir, symbol)
+        if group != last_group:
+            entries.append(("heading", group))
+            last_group = group
+        entries.append(("symbol", name))
+    return entries
+
+
+def selectable_indices(entries):
+    return [index for index, entry in enumerate(entries) if entry[0] == "symbol"]
+
+
+def next_selectable(entries, selected, step):
+    index = selected + step
+    while 0 <= index < len(entries):
+        if entries[index][0] == "symbol":
+            return index
+        index += step
+    return selected
+
+
+def clamp_selectable(entries, selected):
+    if entries[selected][0] == "symbol":
+        return selected
+    for index in range(selected + 1, len(entries)):
+        if entries[index][0] == "symbol":
+            return index
+    for index in range(selected - 1, -1, -1):
+        if entries[index][0] == "symbol":
+            return index
+    return selected
+
+
+def color_pair(pair):
+    if curses.has_colors():
+        return curses.color_pair(pair)
+    return curses.A_NORMAL
+
+
+def draw_text(screen, row, column, text, width, attributes=curses.A_NORMAL):
+    if width <= 0:
+        return
+    try:
+        screen.addnstr(row, column, text, width, attributes)
+    except curses.error:
+        pass
+
+
+def draw_bar(screen, row, text, attributes):
+    height, width = screen.getmaxyx()
+    if 0 <= row < height:
+        draw_text(screen, row, 0, text.ljust(width), max(1, width - 1), attributes)
+
+
 def edit_value(screen, symbol, current, row):
     height, width = screen.getmaxyx()
     prompt = "CONFIG_{}: ".format(symbol.name)
@@ -56,11 +136,56 @@ def edit_value(screen, symbol, current, row):
     return kconfig.parse_value(symbol.kind, raw, symbol.path, row)
 
 
-def menu(screen, symbols, values):
-    names = sorted(symbols)
-    selected = 0
+def draw_help(screen, source_dir, symbol, values, top, left, height, width):
+    if width < 12:
+        return
+    panel_attr = color_pair(4)
+    title_attr = color_pair(5) | curses.A_BOLD
+    for row in range(top, top + height):
+        draw_text(screen, row, left, " " * width, width, panel_attr)
+    draw_text(screen, top, left + 1, "Symbol", width - 2, title_attr)
+    lines = [
+        "CONFIG_{}".format(symbol.name),
+        "",
+        "Prompt: {}".format(symbol.prompt),
+        "Type: {}".format(symbol.kind),
+        "Value: {}".format(render_value(symbol, values[symbol.name])),
+        "Defined at: {}:{}".format(symbol_location(source_dir, symbol), symbol.line),
+    ]
+    if symbol.default is not None:
+        lines.append("Default: {}".format(symbol.default))
+    if symbol.dependency:
+        lines.append("Depends on: CONFIG_{}".format(symbol.dependency))
+        lines.append("Dependency value: {}".format(
+            "y" if values[symbol.dependency] else "n"
+        ))
+    row = top + 2
+    for line in lines:
+        if row >= top + height:
+            break
+        draw_text(screen, row, left + 1, line, width - 2, panel_attr)
+        row += 1
+
+
+def menu(screen, source_dir, symbols, values):
+    entries = build_entries(source_dir, symbols)
+    selectable = selectable_indices(entries)
+    if not selectable:
+        return False
+    selected = selectable[0]
     offset = 0
-    status = "Arrows: move  Space/Enter: edit  S: save  Q: quit"
+    status = "Ready"
+    try:
+        curses.start_color()
+        curses.use_default_colors()
+        curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_CYAN)
+        curses.init_pair(2, curses.COLOR_CYAN, -1)
+        curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_WHITE)
+        curses.init_pair(4, curses.COLOR_WHITE, curses.COLOR_BLUE)
+        curses.init_pair(5, curses.COLOR_YELLOW, curses.COLOR_BLUE)
+        curses.init_pair(6, curses.COLOR_WHITE, curses.COLOR_BLACK)
+    except curses.error:
+        pass
     try:
         curses.curs_set(0)
     except curses.error:
@@ -68,42 +193,84 @@ def menu(screen, symbols, values):
     screen.keypad(True)
     while True:
         height, width = screen.getmaxyx()
-        visible = max(1, height - 4)
+        if height < 8 or width < 48:
+            screen.erase()
+            draw_text(screen, 0, 0, "Terminal too small for menuconfig", width - 1)
+            screen.refresh()
+            key = screen.getch()
+            if key in (ord("q"), ord("Q")):
+                return False
+            continue
+        visible = max(1, height - 5)
         if selected < offset:
             offset = selected
         elif selected >= offset + visible:
             offset = selected - visible + 1
+        if offset > 0 and entries[offset][0] == "symbol":
+            while offset > 0 and entries[offset - 1][0] == "symbol":
+                offset -= 1
+                if selected - offset >= visible:
+                    offset += 1
+                    break
+        detail_width = max(24, min(44, width // 3))
+        list_width = width - detail_width - 1
         screen.erase()
-        screen.addnstr(0, 0, "simple-boot menuconfig", max(1, width - 1), curses.A_BOLD)
-        screen.addnstr(1, 0, status, max(1, width - 1))
-        for index in range(offset, min(len(names), offset + visible)):
-            name = names[index]
+        draw_bar(screen, 0, " simple-boot nconfig", color_pair(1) | curses.A_BOLD)
+        draw_bar(screen, 1, " " + status, color_pair(6))
+        draw_text(screen, 2, 0, "Configuration", list_width, curses.A_BOLD)
+        draw_text(screen, 2, list_width, " ", 1)
+        for index in range(offset, min(len(entries), offset + visible)):
+            entry = entries[index]
+            row = index - offset + 3
+            if entry[0] == "heading":
+                line = "  {}  ".format(entry[1])
+                draw_text(screen, row, 0, line, list_width, color_pair(2) | curses.A_BOLD)
+                continue
+            name = entry[1]
             symbol = symbols[name]
             enabled = not symbol.dependency or values[symbol.dependency]
-            line = "{:<12} CONFIG_{} - {}".format(
-                render_value(symbol, values[name]), name, symbol.prompt
+            marker = "-->" if index == selected else "   "
+            line = "{} {:<10} {:<34} {}".format(
+                marker, render_value(symbol, values[name]),
+                "CONFIG_{}".format(name), symbol.prompt
             )
             attributes = curses.A_REVERSE if index == selected else curses.A_NORMAL
             if not enabled:
                 line += " (requires CONFIG_{})".format(symbol.dependency)
                 attributes |= curses.A_DIM
-            screen.addnstr(index - offset + 2, 0, line, max(1, width - 1), attributes)
+            if index == selected:
+                attributes |= color_pair(3)
+            draw_text(screen, row, 0, line, list_width, attributes)
+        selected_name = entries[selected][1]
+        draw_help(screen, source_dir, symbols[selected_name], values,
+                  2, list_width + 1, height - 4, detail_width - 1)
+        draw_bar(screen, height - 2,
+                 "  <Up/Down> Move  <Space/Enter> Edit  <S> Save  <Q> Quit",
+                 color_pair(1) | curses.A_BOLD)
+        draw_bar(screen, height - 1,
+                 "  <PgUp/PgDn> Page  <Home/End> Top/Bottom",
+                 color_pair(1))
         screen.refresh()
         key = screen.getch()
         if key in (curses.KEY_UP, ord("k")):
-            selected = max(0, selected - 1)
+            selected = next_selectable(entries, selected, -1)
         elif key in (curses.KEY_DOWN, ord("j")):
-            selected = min(len(names) - 1, selected + 1)
+            selected = next_selectable(entries, selected, 1)
         elif key in (curses.KEY_NPAGE,):
-            selected = min(len(names) - 1, selected + visible)
+            selected = clamp_selectable(entries, min(len(entries) - 1,
+                                                     selected + visible))
         elif key in (curses.KEY_PPAGE,):
-            selected = max(0, selected - visible)
+            selected = clamp_selectable(entries, max(0, selected - visible))
+        elif key in (curses.KEY_HOME, ord("g")):
+            selected = selectable[0]
+        elif key in (curses.KEY_END, ord("G")):
+            selected = selectable[-1]
         elif key in (ord("q"), ord("Q")):
             return False
         elif key in (ord("s"), ord("S")):
             return True
         elif key in (ord(" "), curses.KEY_ENTER, 10, 13):
-            name = names[selected]
+            name = entries[selected][1]
             symbol = symbols[name]
             if symbol.dependency and not values[symbol.dependency]:
                 status = "CONFIG_{} requires CONFIG_{}".format(name, symbol.dependency)
@@ -143,7 +310,7 @@ def main():
             values = kconfig.merge_configs([args.current_config.resolve()], symbols)
         else:
             values = dict(base_values)
-        if not curses.wrapper(menu, symbols, values):
+        if not curses.wrapper(menu, source_dir, symbols, values):
             return
         kconfig.validate_dependencies(symbols, values)
         names = kconfig.changed_names(symbols, values, base_values)

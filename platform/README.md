@@ -139,3 +139,11 @@ A platform directory contains:
 For the QEMU backend, `platform.cmake` also sets `BOOT_QEMU_NAME`,
 `BOOT_QEMU_ARGS`, and `BOOT_QEMU_LOAD_MODE` (`loader`, `kernel`, or `bios`). Other
 platforms can supply their own execution hook without depending on QEMU.
+
+Boot stage entry code is shared by the core boot layer. Platforms may override
+the weak `platform_early_init()`, `platform_arch_init()`, and `platform_init()`
+hooks from their own sources. Add sources common to both stage images with
+`BOOT_PLATFORM_SOURCES`, or add stage-specific implementations with
+`BOOT_PLATFORM_STAGE1_SOURCES` and `BOOT_PLATFORM_STAGE2_SOURCES` in
+`platform.cmake`. `BOOT_PLATFORM_BL1_SOURCES` and `BOOT_PLATFORM_BL2_SOURCES`
+are accepted aliases for platforms that prefer BL naming.
